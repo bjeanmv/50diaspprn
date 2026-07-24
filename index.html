@@ -335,13 +335,26 @@
    ========================================================= */
 const SUPABASE_URL = 'https://crriwqikilyouyaaqdlx.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNycml3cWlraWx5b3V5YWFxZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NjE4MTEsImV4cCI6MjEwMDMzNzgxMX0.9DRHG7Fj2im0RULZACftB2BZYrErF6OakgpOo3dFv6I';
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let supabaseClient = null;
+try{
+  if(!window.supabase) throw new Error('window.supabase indefinido — o script do CDN (jsdelivr) não carregou.');
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+}catch(e){
+  console.error(e);
+  supabaseClient = null;
+}
 const VALOR_MULTA_DIA = 1.00; // R$ por dia furado
 
 let MEMBERS = [];          // nomes, vindos de ranking_concurso.nome
 let rankingGeral = [];     // [{nome, pontos_diarios, pontos_simulados, dias_furados}]
 
 async function fetchRankingGeral(){
+  if(!supabaseClient){
+    mostrarErroSupabase('Biblioteca do Supabase não carregou (CDN jsdelivr indisponível). Rankings via banco ficam desativados, mas o resto do app continua funcionando.');
+    rankingGeral = [];
+    MEMBERS = [];
+    return;
+  }
   const { data, error } = await supabaseClient.from('ranking_concurso')
     .select('nome, pontos_diarios, pontos_simulados, dias_furados');
   console.error(error); // log explícito pedido: null quando não há erro, objeto de erro quando há
@@ -378,6 +391,7 @@ function limparErroSupabase(){
 
 async function ganharPontosDiarios(nome, pontosGanhos){
   if(!nome || !pontosGanhos) return;
+  if(!supabaseClient){ mostrarErroSupabase('Sem conexão com o Supabase — pontos_diarios não foram salvos.'); return; }
   const atual = rankingGeral.find(r => r.nome === nome);
   const novoTotal = (atual ? atual.pontos_diarios : 0) + pontosGanhos;
   const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, pontos_diarios: novoTotal }, { onConflict: 'nome' });
@@ -389,6 +403,7 @@ async function ganharPontosDiarios(nome, pontosGanhos){
 
 async function ganharPontosSimulados(nome, pontosGanhos){
   if(!nome || !pontosGanhos) return;
+  if(!supabaseClient){ mostrarErroSupabase('Sem conexão com o Supabase — pontos_simulados não foram salvos.'); return; }
   const atual = rankingGeral.find(r => r.nome === nome);
   const novoTotal = (atual ? atual.pontos_simulados : 0) + pontosGanhos;
   const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, pontos_simulados: novoTotal }, { onConflict: 'nome' });
@@ -400,6 +415,7 @@ async function ganharPontosSimulados(nome, pontosGanhos){
 
 async function ajustarDiasFurados(nome, delta){
   if(!nome || !delta) return;
+  if(!supabaseClient){ mostrarErroSupabase('Sem conexão com o Supabase — dias_furados não foi salvo.'); return; }
   const atual = rankingGeral.find(r => r.nome === nome);
   const novoTotal = Math.max(0, (atual ? atual.dias_furados : 0) + delta);
   const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, dias_furados: novoTotal }, { onConflict: 'nome' });
@@ -1145,10 +1161,10 @@ async function finalizarSimulado(){
 }
 
 async function init(){
-  await fetchRankingGeral();
+  try{ await fetchRankingGeral(); }catch(e){ console.error(e); mostrarErroSupabase('Erro inesperado ao carregar ranking_concurso: ' + e.message); }
   buildNav();
-  await loadStudent();
-  await loadAll();
+  try{ await loadStudent(); }catch(e){ console.error(e); }
+  try{ await loadAll(); }catch(e){ console.error(e); }
   renderRankingGeral();
 }
 init();
