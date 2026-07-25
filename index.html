@@ -115,8 +115,8 @@
   .result-detail{color:var(--muted);font-size:13.5px;}
 
   @media (max-width:520px){.timer-display{font-size:42px;} h1{font-size:19px;}}
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div class="wrap">
@@ -207,216 +207,259 @@
       </div>
     </div>
 
-      <!-- SEÇÃO DE RANKINGS TRI-ABAS (CORRIGIDA E FECHADA SEM ALTERAR DESIGN) -->
-  <div class="card">
-    <h2>Placar e Classificação Geral</h2>
-    <div class="tab-container">
-      <button id="btn-tab-geral" class="tab-btn active" onclick="mudarAba('geral')">Ranking Geral</button>
-      <button id="btn-tab-diario" class="tab-btn" onclick="mudarAba('diario')">Ranking Diário</button>
-      <button id="btn-tab-simulado" class="tab-btn" onclick="mudarAba('simulado')">Ranking Simulados</button>
-    </div>
-
-    <!-- ABA GERAL FECHADA CORRETAMENTE -->
-    <div id="panel-geral" class="ranking-panel active">
+    <div class="card">
+      <h2>🏆 Ranking Geral (placar principal)</h2>
+      <p class="hint">Soma de pontos dos questionários diários + simulados semanais, do maior para o menor. Inclui o total de multas acumuladas.</p>
       <table>
-        <thead>
-          <tr><th>Pos</th><th>Nome</th><th>Pontos Diários</th><th>Simulados</th><th>Total Geral</th><th>Multa</th></tr>
-        </thead>
+        <thead><tr><th>#</th><th>Integrante</th><th>Pontos diários</th><th>Pontos simulados</th><th>Total de pontos</th><th>Multas</th></tr></thead>
         <tbody id="rankingPrincipalTable"></tbody>
       </table>
     </div>
 
-    <!-- ABA DIÁRIO FECHADA CORRETAMENTE -->
-    <div id="panel-diario" class="ranking-panel">
+    <div class="card">
+      <h2>📘 Ranking Diário</h2>
+      <p class="hint">Ordenado por pontos diários, do maior para o menor.</p>
       <table>
-        <thead>
-          <tr><th>Pos</th><th>Nome</th><th>Pontos Diários</th></tr>
-        </thead>
+        <thead><tr><th>#</th><th>Integrante</th><th>Pontos diários</th></tr></thead>
         <tbody id="rankingDiarioTable"></tbody>
       </table>
     </div>
 
-    <!-- ABA SIMULADO FECHADA CORRETAMENTE -->
-    <div id="panel-simulado" class="ranking-panel">
+    <div class="card">
+      <h2>🕐 Ranking de Simulados</h2>
+      <p class="hint">Ordenado por pontos simulados, do maior para o menor.</p>
       <table>
-        <thead>
-          <tr><th>Pos</th><th>Nome</th><th>Pontos Simulado</th></tr>
-        </thead>
+        <thead><tr><th>#</th><th>Integrante</th><th>Pontos simulados</th></tr></thead>
         <tbody id="rankingSimuladosPontosTable"></tbody>
       </table>
     </div>
   </div>
+
+  <!-- ======================= SIMULADOS ======================= -->
+  <div id="view-simulado" style="display:none;">
+    <div class="card">
+      <button class="btn-ghost" onclick="goToView('lista-simulados')" style="margin-bottom:14px;">← Voltar aos simulados</button>
+      <h2 id="simTituloAtual">Simulado</h2>
+      <p class="hint">
+        Ritmo oficial do Instituto Avalia: 100 questões em 5h (3 min/questão). Para 50 questões, o cronômetro é
+        fixo em <b>2h30 (150 minutos)</b>.
+      </p>
+      <div id="simGate" class="gate" style="display:none;">
+        <p>Selecione seu nome no topo da página antes de iniciar o simulado.</p>
+      </div>
+      <div id="simSetupArea" class="btn-row">
+        <button class="btn-accent" id="simIniciarBtn" onclick="iniciarSimulado()">Iniciar simulado</button>
+      </div>
+      <p class="hint" id="simIndisponivel" style="display:none;color:var(--danger);margin-top:10px;">
+        O simulado desta data ainda não foi gerado. Assim que o grupo avançar no cronograma, ele entra aqui.
+      </p>
+      <div class="timer-box" id="simTimerBox" style="display:none;">
+        <div id="simTimerDisplay" class="timer-display">02:30:00</div>
+        <div class="sub" id="simTimerLabel" style="margin-top:-6px;"></div>
+      </div>
+    </div>
+    <div id="simQuizArea"></div>
+    <div class="result-card" id="simResultCard">
+      <div class="sub">Resultado do simulado</div>
+      <div class="result-score" id="simScoreText">0/50</div>
+      <div class="result-detail" id="simScoreDetail"></div>
+    </div>
+
+    <div class="card">
+      <h2>Histórico de resultados</h2>
+      <p class="hint">Resultados de todos os integrantes em todos os simulados de domingo já realizados.</p>
+      <label style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+        Meta mínima de acertos:
+        <input id="metaAcertos" type="number" value="30" min="0" max="50" style="width:60px;" onchange="renderSimuladoTable()">
+      </label>
+      <div id="simuladoTable"></div>
+    </div>
+  </div>
+
+  <!-- ======================= LISTA: ESTUDO DIÁRIO ======================= -->
+  <div id="view-lista-dias" style="display:none;">
+    <div class="card">
+      <h2>Estudo diário</h2>
+      <p class="hint">Clique no dia para ver a teoria resumida (palavras-chave e mnemônicos) e o questionário de 30 questões.</p>
+      <div class="day-list" id="listaDiasButtons"></div>
+    </div>
+  </div>
+
+  <!-- ======================= LISTA: SIMULADOS ======================= -->
+  <div id="view-lista-simulados" style="display:none;">
+    <div class="card">
+      <h2>Simulados de domingo</h2>
+      <p class="hint">Clique no simulado para iniciar o cronômetro de 2h30 e responder as 50 questões.</p>
+      <div class="day-list" id="listaSimuladosButtons"></div>
+    </div>
+  </div>
+
+  <!-- ======================= DIA (TEORIA + QUESTIONÁRIO) ======================= -->
+  <div id="view-quiz" style="display:none;">
+    <div class="card" style="margin-bottom:14px;">
+      <button class="btn-ghost" onclick="goToView('lista-dias')" style="margin-bottom:14px;">← Voltar ao estudo diário</button>
+      <h2 id="quizDayLabel">Dia</h2>
+      <p class="hint" id="quizDaySub"></p>
+      <div class="disc-row" id="quizDiscRow"></div>
+    </div>
+
+    <div id="theoryArea"></div>
+
+    <div class="card" style="margin-bottom:14px;">
+      <h2>Questionário do dia</h2>
+      <p class="hint">Modelo Instituto Avalia · múltipla escolha A-D · resposta e comentário aparecem ao clicar.</p>
+      <div id="quizGate" class="gate" style="display:none;">
+        <p>Selecione seu nome no topo da página para que este resultado seja contabilizado no ranking.</p>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+    <div id="quizArea"></div>
+    <div class="result-card" id="resultCard">
+      <div class="sub">Resultado final</div>
+      <div class="result-score" id="scoreText">0/0</div>
+      <div class="result-detail" id="scoreDetail"></div>
+      <div class="btn-row" style="justify-content:center;"><button onclick="restartQuiz()">Refazer este questionário</button></div>
+    </div>
+  </div>
+
 </div>
+
 <script>
 /* =========================================================
+   ALUNOS (lista fixa)
+   ========================================================= */
+/* =========================================================
    SUPABASE — integração com a tabela ranking_concurso
+   (colunas: nome, pontos_diarios, pontos_simulados, dias_furados)
    ========================================================= */
 const SUPABASE_URL = 'https://crriwqikilyouyaaqdlx.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNycml3cWlraWx5b3V5YWFxZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NjE4MTEsImV4cCI6MjEwMDMzNzgxMX0.9DRHG7Fj2im0RULZACftB2BZYrErF6OakgpOo3dFv6I';
 let supabaseClient = null;
 
 try {
+  // CORREÇÃO DA INICIALIZAÇÃO DA BIBLIOTECA V2
   if (typeof supabase !== 'undefined') {
     supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  } else if (window.supabase) {
+  } else if (typeof window.supabase !== 'undefined') {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  } else {
+    throw new Error('A biblioteca do Supabase não foi carregada no navegador.');
   }
-} catch(e){
-  console.error("Erro na inicialização:", e);
+} catch(e) {
+  console.error("Erro ao inicializar Supabase:", e);
+  supabaseClient = null;
 }
 
-const VALOR_MULTA_DIA = 1.00;
-let MEMBERS = [];          
-let rankingGeral = [];     
-let currentStudent = ""; // CORREÇÃO: Iniciando vazia para não quebrar a busca
+const VALOR_MULTA_DIA = 1.00; // R$ por dia furado
+
+let MEMBERS = [];          // nomes, vindos de ranking_concurso.nome
+let rankingGeral = [];     // [{nome, pontos_diarios, pontos_simulados, dias_furados}]
 
 async function fetchRankingGeral(){
-  if(!supabaseClient) return;
-  try {
-    const { data, error } = await supabaseClient.from('ranking_concurso').select('*');
-    if(error) throw error;
-    
-    rankingGeral = (data || []).map(r => ({
-      nome: r.nome,
-      pontos_diarios: r.pontos_diarios || 0,
-      pontos_simulados: r.pontos_simulados || 0,
-      dias_furados: r.dias_furados || 0
-    }));
-    MEMBERS = rankingGeral.map(r => r.nome);
-    
-    renderizarSelecaoUsuarios();
-    renderMultaTable();
-    renderRankingGeral();
-  } catch(err) {
-    console.error("Falha ao ler dados:", err);
+  if(!supabaseClient){
+    mostrarErroSupabase('Biblioteca do Supabase não carregou (CDN jsdelivr indisponível). Rankings via banco ficam desativados, mas o resto do app continua funcionando.');
+    rankingGeral = [];
+    MEMBERS = [];
+    return;
   }
-}
-
-function renderizarSelecaoUsuarios() {
-  const select = document.getElementById('user-select') || document.getElementById('student-select');
-  if(!select) return;
-  const valorAtual = select.value;
-  select.innerHTML = '<option value="">— selecione seu nome —</option>';
-  MEMBERS.forEach(nome => {
-    const opt = document.createElement('option');
-    opt.value = nome; opt.innerText = nome;
-    if(nome === valorAtual || nome === currentStudent) opt.selected = true;
-    select.appendChild(opt);
-  });
-}
-
-function selecionarUsuario() {
-  const select = document.getElementById('user-select') || document.getElementById('student-select');
-  if(select) {
-    currentStudent = select.value;
-    renderRankingGeral();
+  const { data, error } = await supabaseClient.from('ranking_concurso')
+    .select('nome, pontos_diarios, pontos_simulados, dias_furados');
+  
+  if(error){
+    console.error("Erro na leitura:", error);
+    mostrarErroSupabase('Falha ao LER ranking_concurso: ' + error.message + (error.hint ? (' — dica: ' + error.hint) : ''));
+    rankingGeral = [];
+    MEMBERS = [];
+    return;
   }
-}
-
-async function computarAtividade(tipo, pontosGanhos) {
-  const select = document.getElementById('user-select') || document.getElementById('student-select');
-  if(select) currentStudent = select.value;
-
-  if(!currentStudent) { 
-    alert("Selecione seu nome no campo 'Aluno' no topo primeiro!"); 
-    return; 
-  }
-  if(tipo === 'diario') {
-    await ganharPontosDiarios(currentStudent, pontosGanhos);
+  if((data || []).length === 0){
+    mostrarErroSupabase('Conectado ao Supabase, mas ranking_concurso não retornou nenhuma linha. Confirme se a tabela tem registros e se a Row Level Security permite leitura (SELECT) para a role "anon".');
   } else {
-    await ganharPontosSimulados(currentStudent, pontosGanhos);
+    limparErroSupabase();
+  }
+  rankingGeral = (data || []).map(r => ({
+    nome: r.nome,
+    pontos_diarios: r.pontos_diarios || 0,
+    pontos_simulados: r.pontos_simulados || 0,
+    dias_furados: r.dias_furados || 0
+  }));
+  MEMBERS = rankingGeral.map(r => r.nome);
+  
+  // ALIMENTA A LISTA SUSPENSA DE PARTICIPANTES DINAMICAMENTE SE ELA EXISTIR
+  const selectEstudante = document.getElementById('student-select') || document.getElementById('user-select');
+  if (selectEstudante) {
+    const valorAtual = selectEstudante.value;
+    selectEstudante.innerHTML = '<option value="">-- Escolha seu Nome --</option>';
+    MEMBERS.forEach(nome => {
+      const opt = document.createElement('option');
+      opt.value = nome;
+      opt.innerText = nome;
+      if(nome === valorAtual) opt.selected = true;
+      selectEstudante.appendChild(opt);
+    });
   }
 }
 
-async function computarAtividadeDirect(tipo, pontosGanhos) {
-  await computarAtividade(tipo, pontosGanhos);
+function mostrarErroSupabase(msg){
+  const el = document.getElementById('supabaseStatus');
+  if(!el) return;
+  el.style.display = '';
+  el.innerHTML = '<p><b>⚠ Problema de conexão com o Supabase:</b><br>' + msg + '</p>';
+}
+function limparErroSupabase(){
+  const el = document.getElementById('supabaseStatus');
+  if(el) el.style.display = 'none';
 }
 
 async function ganharPontosDiarios(nome, pontosGanhos){
-  const aluno = nome || currentStudent;
-  if(!aluno) return;
-  const atual = rankingGeral.find(r => r.nome === aluno);
-  const novoTotal = (atual ? (atual.pontos_diarios || 0) : 0) + pontosGanhos;
-  
-  try {
-    const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: aluno, pontos_diarios: novoTotal }, { onConflict: 'nome' });
-    if(error) throw error;
-    alert('Progresso diário salvo com sucesso!');
-    await fetchRankingGeral();
-  } catch(err) {
-    console.error(err);
-  }
+  if(!nome || !pontosGanhos) return;
+  if(!supabaseClient){ mostrarErroSupabase('Sem conexão com o Supabase — pontos_diarios não foram salvos.'); return; }
+  const atual = rankingGeral.find(r => r.nome === nome);
+  const novoTotal = (atual ? atual.pontos_diarios : 0) + pontosGanhos;
+  const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, pontos_diarios: novoTotal }, { onConflict: 'nome' });
+  if(error){ console.error(error); mostrarErroSupabase('Falha ao SALVAR pontos_diarios de "' + nome + '": ' + error.message); return; }
+  await fetchRankingGeral();
+  renderRankingGeral();
 }
 
 async function ganharPontosSimulados(nome, pontosGanhos){
-  const aluno = nome || currentStudent;
-  if(!aluno) return;
-  const atual = rankingGeral.find(r => r.nome === aluno);
-  const novoTotal = (atual ? (atual.pontos_simulados || 0) : 0) + pontosGanhos;
-  
-  try {
-    const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: aluno, pontos_simulados: novoTotal }, { onConflict: 'nome' });
-    if(error) throw error;
-    alert('Pontos do simulado salvos com sucesso!');
-    await fetchRankingGeral();
-  } catch(err) {
-    console.error(err);
-  }
+  if(!nome || !pontosGanhos) return;
+  if(!supabaseClient){ mostrarErroSupabase('Sem conexão com o Supabase — pontos_simulados não foram salvos.'); return; }
+  const atual = rankingGeral.find(r => r.nome === nome);
+  const novoTotal = (atual ? atual.pontos_simulados : 0) + pontosGanhos;
+  const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, pontos_simulados: novoTotal }, { onConflict: 'nome' });
+  if(error){ console.error(error); mostrarErroSupabase('Falha ao SALVAR pontos_simulados de "' + nome + '": ' + error.message); return; }
+  await fetchRankingGeral();
+  renderRankingGeral();
 }
 
 async function ajustarDiasFurados(nome, delta){
-  if(!nome) return;
+  if(!nome || !delta) return;
+  if(!supabaseClient){ mostrarErroSupabase('Sem conexão com o Supabase — dias_furados não foi salvo.'); return; }
   const atual = rankingGeral.find(r => r.nome === nome);
-  const novoTotal = Math.max(0, (atual ? (atual.dias_furados || 0) : 0) + delta);
-  
-  try {
-    const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, dias_furados: novoTotal }, { onConflict: 'nome' });
-    if(error) throw error;
-    await fetchRankingGeral();
-  } catch(err) {
-    console.error(err);
-  }
-}
-
-function renderMultaTable() {
-  const grid = document.getElementById('checkin-list') || document.querySelector('.checkin-grid');
-  if(!grid) return;
-  grid.innerHTML = "";
-  
-  let totalAcumuladoGrupo = 0;
-
-  rankingGeral.forEach(u => {
-    const multaIndividual = u.dias_furados * VALOR_MULTA_DIA;
-    totalAcumuladoGrupo += multaIndividual;
-
-    const item = document.createElement('div');
-    item.className = 'checkin-item';
-    item.innerHTML = `
-      <span class="name">${u.nome} <small style="color:var(--muted);">(${u.dias_furados} furos)</small></span>
-      <div class="toggle-btns">
-        <button class="btn-accent" style="padding:4px 8px; font-size:12px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', 1)">+ Furou</button>
-        <button class="btn-ghost" style="padding:4px 8px; font-size:12px; margin-left:4px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', -1)">- Remover</button>
-      </div>
-    `;
-    grid.appendChild(item);
-  });
-
-  const elements = document.getElementsByTagName('*');
-  for (let i = 0; i < elements.length; i++) {
-    if (elements[i].innerText && (elements[i].innerText.includes('0,00') || elements[i].className?.includes('multa'))) {
-      if (elements[i].children.length === 0) {
-        elements[i].innerText = `R$ ${totalAcumuladoGrupo.toFixed(2)}`;
-        break;
-      }
-    }
-  }
+  const novoTotal = Math.max(0, (atual ? atual.dias_furados : 0) + delta);
+  const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, dias_furados: novoTotal }, { onConflict: 'nome' });
+  if(error){ console.error(error); mostrarErroSupabase('Falha ao SALVAR dias_furados de "' + nome + '": ' + error.message); return; }
+  await fetchRankingGeral();
+  renderRankingGeral();
+  if (typeof renderMultaTable === 'function') renderMultaTable();
+  if (typeof renderAdminPanel === 'function') renderAdminPanel();
 }
 
 function renderRankingGeral(){
   const tPrincipal = document.getElementById('rankingPrincipalTable') || document.getElementById('table-geral');
   const tDiario = document.getElementById('rankingDiarioTable') || document.getElementById('table-diario');
   const tSimulados = document.getElementById('rankingSimuladosPontosTable') || document.getElementById('table-simulado');
-  
+  if(!tPrincipal && !tDiario && !tSimulados) return;
+
+  if(rankingGeral.length === 0){
+    const vazio = '<tr><td colspan="6" class="empty">Nenhum participante encontrado em ranking_concurso.</td></tr>';
+    if(tPrincipal) tPrincipal.innerHTML = vazio;
+    if(tDiario) tDiario.innerHTML = '<tr><td colspan="3" class="empty">—</td></tr>';
+    if(tSimulados) tSimulados.innerHTML = '<tr><td colspan="3" class="empty">—</td></tr>';
+    return;
+  }
+
   if(tPrincipal){
     const principal = [...rankingGeral]
       .map(r => ({ ...r, total: r.pontos_diarios + r.pontos_simulados, multa: r.dias_furados * VALOR_MULTA_DIA }))
@@ -434,8 +477,8 @@ function renderRankingGeral(){
   if(tDiario){
     const diario = [...rankingGeral].sort((a,b) => b.pontos_diarios - a.pontos_diarios);
     tDiario.innerHTML = diario.map((r, i) => `<tr>
-      <td class="pos">${i+1}º</td>
-      <td>${r.nome}</td>
+      <td class="pos ${i===0 ? 'gold' : ''}">${i+1}º</td>
+      <td>${r.nome}${r.nome===currentStudent ? ' <span class="pill ok">você</span>' : ''}</td>
       <td class="mono">${r.pontos_diarios}</td>
     </tr>`).join('');
   }
@@ -443,25 +486,39 @@ function renderRankingGeral(){
   if(tSimulados){
     const simulados = [...rankingGeral].sort((a,b) => b.pontos_simulados - a.pontos_simulados);
     tSimulados.innerHTML = simulados.map((r, i) => `<tr>
-      <td class="pos">${i+1}º</td>
-      <td>${r.nome}</td>
+      <td class="pos ${i===0 ? 'gold' : ''}">${i+1}º</td>
+      <td>${r.nome}${r.nome===currentStudent ? ' <span class="pill ok">você</span>' : ''}</td>
       <td class="mono">${r.pontos_simulados}</td>
     </tr>`).join('');
   }
 }
+let currentStudent = null;
 
-window.addEventListener('DOMContentLoaded', () => {
-  const select = document.getElementById('user-select') || document.getElementById('student-select');
+// GATILHO DE ATUALIZAÇÃO DO USUÁRIO SELECIONADO
+function selecionarUsuario() {
+  const select = document.getElementById('student-select') || document.getElementById('user-select');
+  if(select) {
+    currentStudent = select.value;
+    renderRankingGeral();
+  }
+}
+
+// INICIALIZAÇÃO CORRETA AO CARREGAR A PÁGINA
+window.addEventListener('DOMContentLoaded', async () => {
+  await fetchRankingGeral();
+  renderRankingGeral();
+  
+  // Vincula a função de mudança da lista suspensa caso o Claude mude o id
+  const select = document.getElementById('student-select') || document.getElementById('user-select');
   if(select) {
     select.addEventListener('change', selecionarUsuario);
   }
-  setTimeout(async () => {
-    await fetchRankingGeral();
-  }, 400);
 });
 
 /* =========================================================
    CONTEÚDO POR DIA — teoria + questionário.
+   Para adicionar um novo dia, acrescente uma chave (ex: 2)
+   com label, sub, disciplinas, teoria (blocos) e questions.
    ========================================================= */
 const QUIZZES = {
   1: {
@@ -474,6 +531,7 @@ const QUIZZES = {
         palavrasChave: ["Servidor", "Cargo público", "Classe", "Categoria funcional", "Grupo", "Quadro", "Isolado", "Carreira", "Provimento efetivo", "Comissão", "Mandato revogável", "Desvio de função"],
         paragrafos: [
           "A LC 122/1994 institui o <b>Estatuto</b> dos servidores públicos civis do Estado do RN. O Título I (Art. 1º a 3º) traz as definições-base: <b>servidor</b> é a pessoa investida em cargo; <b>cargo público</b> é o conjunto de atribuições — não confunda os dois.",
+
           "Os agrupamentos crescem em escala: <b>classe → categoria funcional → grupo → quadro</b>. Classe agrupa cargos; categoria funcional agrupa classes; grupo agrupa cargos isolados e categorias afins; quadro é o conjunto de todos os cargos de um Poder ou órgão.",
           "O §1º do Art. 2º separa os cargos em 4 tipos: <b>isolado</b>, <b>de carreira</b>, <b>de provimento efetivo</b> e <b>em comissão</b>. Isolado e carreira falam da estrutura do cargo; efetivo e comissão falam da forma de provimento (a diferença entre eles é o que a banca mais testa).",
           "O <b>mandato</b> (função por tempo limitado) é sempre revogável, mesmo quando preenchido por eleição, salvo disposição em contrário — regra que costuma ser invertida em questões de Certo/Errado.",
