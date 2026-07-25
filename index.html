@@ -369,10 +369,10 @@ async function fetchRankingGeral(){
 }
 
 function renderizarSelecaoUsuarios() {
-  const select = document.getElementById('user-select') || document.getElementById('student-select');
+  const select = document.getElementById('user-select') || document.getElementById('student-select') || document.querySelector('select');
   if(!select) return;
   const valorAtual = select.value;
-  select.innerHTML = '<option value="">-- Escolha seu Nome --</option>';
+  select.innerHTML = '<option value="">— selecione seu nome —</option>';
   MEMBERS.forEach(nome => {
     const opt = document.createElement('option');
     opt.value = nome; opt.innerText = nome;
@@ -382,17 +382,19 @@ function renderizarSelecaoUsuarios() {
 }
 
 function selecionarUsuario() {
-  const select = document.getElementById('user-select') || document.getElementById('student-select');
+  const select = document.getElementById('user-select') || document.getElementById('student-select') || document.querySelector('select');
   if(select) {
     currentStudent = select.value;
     renderRankingGeral();
   }
 }
 
-// CORREÇÃO ESSENCIAL: FUNÇÃO "PONTE" PARA ADAPTAR OS BOTÕES DO CLAUDE (UNIFICADA)
 async function computarAtividade(tipo, pontosGanhos) {
+  const select = document.getElementById('user-select') || document.getElementById('student-select') || document.querySelector('select');
+  if(select) currentStudent = select.value;
+
   if(!currentStudent) { 
-    alert("Selecione seu nome na lista suspensa do topo primeiro!"); 
+    alert("Selecione seu nome no campo 'Aluno' no topo primeiro!"); 
     return; 
   }
   if(tipo === 'diario') {
@@ -402,7 +404,6 @@ async function computarAtividade(tipo, pontosGanhos) {
   }
 }
 
-// FUNÇÃO COMPATÍVEL COM OUTRAS VERSÕES DE BOTÕES DO SEU HTML
 async function computarAtividadeDirect(tipo, pontosGanhos) {
   await computarAtividade(tipo, pontosGanhos);
 }
@@ -416,7 +417,7 @@ async function ganharPontosDiarios(nome, pontosGanhos){
   try {
     const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: aluno, pontos_diarios: novoTotal }, { onConflict: 'nome' });
     if(error) throw error;
-    alert('Pontos diários salvos com sucesso!');
+    alert('Progresso diário salvo com sucesso!');
     await fetchRankingGeral();
   } catch(err) {
     console.error(err);
@@ -453,26 +454,62 @@ async function ajustarDiasFurados(nome, delta){
   }
 }
 
+// ADAPTAÇÃO COMPLETA PARA A TABELA DE MULTAS DO SEU LAYOUT ESCURO
 function renderMultaTable() {
-  const grid = document.getElementById('checkin-list');
+  // Procura pelo corpo da tabela de multas ou pelo contêiner genérico do Claude
+  const grid = document.getElementById('checkin-list') || document.querySelector('.checkin-grid') || document.querySelector('#panel-multas tbody') || document.querySelector('table tbody');
   if(!grid) return;
   grid.innerHTML = "";
+  
+  let totalAcumuladoGrupo = 0;
+
   rankingGeral.forEach(u => {
-    const item = document.createElement('div');
-    item.className = 'checkin-item';
-    item.innerHTML = `
-      <span class="name">${u.nome} <small style="color:var(--muted);">(${u.dias_furados} furos)</small></span>
-      <div class="toggle-btns">
-        <button class="btn-accent" style="padding:4px 8px; font-size:12px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', 1)">+ Furou</button>
-        <button class="btn-ghost" style="padding:4px 8px; font-size:12px; margin-left:4px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', -1)">- Remover</button>
-      </div>
-    `;
-    grid.appendChild(item);
+    const multaIndividual = u.dias_furados * VALOR_MULTA_DIA;
+    totalAcumuladoGrupo += multaIndividual;
+
+    // Se o elemento destino for uma tabela HTML (tbody), renderiza como linha (tr)
+    if (grid.tagName === 'TBODY') {
+      grid.innerHTML += `
+        <tr>
+          <td>${u.nome}</td>
+          <td class="mono" style="text-align:center;">
+            <button style="background:var(--danger-dim); color:var(--danger); border:1px solid var(--danger); padding:2px 8px; border-radius:4px; cursor:pointer; font-size:11px; margin-right:6px;" onclick="ajustarDiasFurados('${u.nome}', 1)">+ Furou</button>
+            <span>${u.dias_furados}</span>
+            <button style="background:var(--success-dim); color:var(--success); border:1px solid var(--success); padding:2px 8px; border-radius:4px; cursor:pointer; font-size:11px; margin-left:6px;" onclick="ajustarDiasFurados('${u.nome}', -1)">-</button>
+          </td>
+          <td class="mono" style="color:var(--danger); text-align:right;">R$ ${multaIndividual.toFixed(2)}</td>
+        </tr>
+      `;
+    } else {
+      // Caso contrário, renderiza no formato de blocos (div) padrão do checkin-item
+      const item = document.createElement('div');
+      item.className = 'checkin-item';
+      item.innerHTML = `
+        <span class="name">${u.nome} <small style="color:var(--muted);">(${u.dias_furados} furos)</small></span>
+        <div class="toggle-btns">
+          <button class="btn-accent" style="padding:4px 8px; font-size:12px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', 1)">+ Furou</button>
+          <button class="btn-ghost" style="padding:4px 8px; font-size:12px; margin-left:4px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', -1)">- Remover</button>
+        </div>
+      `;
+      grid.appendChild(item);
+    }
   });
+
+  // Atualiza o contador de "Total acumulado pelo grupo" na tela se ele existir
+  const elTotal = document.querySelector('.total-multa') || document.getElementById('total-multa-grupo') || document.all?.tags?.('div')?.['total-multa'];
+  // Tenta localizar o texto de R$ 0,00 no seu painel para atualizar dinamicamente
+  const elements = document.getElementsByTagName('*');
+  for (let i = 0; i < elements.length; i++) {
+    if (elements[i].innerText === 'R$ 0,00' || elements[i].className?.includes('multa')) {
+      elements[i].innerText = `R$ ${totalAcumuladoGrupo.toFixed(2)}`;
+      elements[i].style.color = 'var(--danger)';
+      break;
+    }
+  }
 }
 
 function renderRankingGeral(){
-  const tPrincipal = document.getElementById('rankingPrincipalTable') || document.getElementById('table-geral');
+  const tPrincipal = document.getElementById('rankingPrincipalTable') || document.getElementById('table-geral') || document.querySelectorAll('table tbody')[1];
   const tDiario = document.getElementById('rankingDiarioTable') || document.getElementById('table-diario');
   const tSimulados = document.getElementById('rankingSimuladosPontosTable') || document.getElementById('table-simulado');
   
@@ -489,34 +526,16 @@ function renderRankingGeral(){
       <td class="mono" style="color:var(--danger);">R$ ${r.multa.toFixed(2)}</td>
     </tr>`).join('');
   }
-
-  if(tDiario){
-    const diario = [...rankingGeral].sort((a,b) => b.pontos_diarios - a.pontos_diarios);
-    tDiario.innerHTML = diario.map((r, i) => `<tr>
-      <td class="pos">${i+1}º</td>
-      <td>${r.nome}</td>
-      <td class="mono">${r.pontos_diarios}</td>
-    </tr>`).join('');
-  }
-
-  if(tSimulados){
-    const simulados = [...rankingGeral].sort((a,b) => b.pontos_simulados - a.pontos_simulados);
-    tSimulados.innerHTML = simulados.map((r, i) => `<tr>
-      <td class="pos">${i+1}º</td>
-      <td>${r.nome}</td>
-      <td class="mono">${r.pontos_simulados}</td>
-    </tr>`).join('');
-  }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  const select = document.getElementById('user-select') || document.getElementById('student-select');
+  const select = document.getElementById('user-select') || document.getElementById('student-select') || document.querySelector('select');
   if(select) {
     select.addEventListener('change', selecionarUsuario);
   }
   setTimeout(async () => {
     await fetchRankingGeral();
-  }, 500);
+  }, 400);
 });
 
 /* =========================================================
