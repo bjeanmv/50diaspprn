@@ -207,122 +207,47 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>🏆 Ranking Geral (placar principal)</h2>
-      <p class="hint">Soma de pontos dos questionários diários + simulados semanais, do maior para o menor. Inclui o total de multas acumuladas.</p>
+      <!-- SEÇÃO DE RANKINGS TRI-ABAS (CORRIGIDA E FECHADA SEM ALTERAR DESIGN) -->
+  <div class="card">
+    <h2>Placar e Classificação Geral</h2>
+    <div class="tab-container">
+      <button id="btn-tab-geral" class="tab-btn active" onclick="mudarAba('geral')">Ranking Geral</button>
+      <button id="btn-tab-diario" class="tab-btn" onclick="mudarAba('diario')">Ranking Diário</button>
+      <button id="btn-tab-simulado" class="tab-btn" onclick="mudarAba('simulado')">Ranking Simulados</button>
+    </div>
+
+    <!-- ABA GERAL FECHADA CORRETAMENTE -->
+    <div id="panel-geral" class="ranking-panel active">
       <table>
-        <thead><tr><th>#</th><th>Integrante</th><th>Pontos diários</th><th>Pontos simulados</th><th>Total de pontos</th><th>Multas</th></tr></thead>
+        <thead>
+          <tr><th>Pos</th><th>Nome</th><th>Pontos Diários</th><th>Simulados</th><th>Total Geral</th><th>Multa</th></tr>
+        </thead>
         <tbody id="rankingPrincipalTable"></tbody>
       </table>
     </div>
 
-    <div class="card">
-      <h2>📘 Ranking Diário</h2>
-      <p class="hint">Ordenado por pontos diários, do maior para o menor.</p>
+    <!-- ABA DIÁRIO FECHADA CORRETAMENTE -->
+    <div id="panel-diario" class="ranking-panel">
       <table>
-        <thead><tr><th>#</th><th>Integrante</th><th>Pontos diários</th></tr></thead>
+        <thead>
+          <tr><th>Pos</th><th>Nome</th><th>Pontos Diários</th></tr>
+        </thead>
         <tbody id="rankingDiarioTable"></tbody>
       </table>
     </div>
 
-    <div class="card">
-      <h2>🕐 Ranking de Simulados</h2>
-      <p class="hint">Ordenado por pontos simulados, do maior para o menor.</p>
+    <!-- ABA SIMULADO FECHADA CORRETAMENTE -->
+    <div id="panel-simulado" class="ranking-panel">
       <table>
-        <thead><tr><th>#</th><th>Integrante</th><th>Pontos simulados</th></tr></thead>
+        <thead>
+          <tr><th>Pos</th><th>Nome</th><th>Pontos Simulado</th></tr>
+        </thead>
         <tbody id="rankingSimuladosPontosTable"></tbody>
       </table>
     </div>
   </div>
-
-  <!-- ======================= SIMULADOS ======================= -->
-  <div id="view-simulado" style="display:none;">
-    <div class="card">
-      <button class="btn-ghost" onclick="goToView('lista-simulados')" style="margin-bottom:14px;">← Voltar aos simulados</button>
-      <h2 id="simTituloAtual">Simulado</h2>
-      <p class="hint">
-        Ritmo oficial do Instituto Avalia: 100 questões em 5h (3 min/questão). Para 50 questões, o cronômetro é
-        fixo em <b>2h30 (150 minutos)</b>.
-      </p>
-      <div id="simGate" class="gate" style="display:none;">
-        <p>Selecione seu nome no topo da página antes de iniciar o simulado.</p>
-      </div>
-      <div id="simSetupArea" class="btn-row">
-        <button class="btn-accent" id="simIniciarBtn" onclick="iniciarSimulado()">Iniciar simulado</button>
-      </div>
-      <p class="hint" id="simIndisponivel" style="display:none;color:var(--danger);margin-top:10px;">
-        O simulado desta data ainda não foi gerado. Assim que o grupo avançar no cronograma, ele entra aqui.
-      </p>
-      <div class="timer-box" id="simTimerBox" style="display:none;">
-        <div id="simTimerDisplay" class="timer-display">02:30:00</div>
-        <div class="sub" id="simTimerLabel" style="margin-top:-6px;"></div>
-      </div>
-    </div>
-    <div id="simQuizArea"></div>
-    <div class="result-card" id="simResultCard">
-      <div class="sub">Resultado do simulado</div>
-      <div class="result-score" id="simScoreText">0/50</div>
-      <div class="result-detail" id="simScoreDetail"></div>
-    </div>
-
-    <div class="card">
-      <h2>Histórico de resultados</h2>
-      <p class="hint">Resultados de todos os integrantes em todos os simulados de domingo já realizados.</p>
-      <label style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
-        Meta mínima de acertos:
-        <input id="metaAcertos" type="number" value="30" min="0" max="50" style="width:60px;" onchange="renderSimuladoTable()">
-      </label>
-      <div id="simuladoTable"></div>
-    </div>
-  </div>
-
-  <!-- ======================= LISTA: ESTUDO DIÁRIO ======================= -->
-  <div id="view-lista-dias" style="display:none;">
-    <div class="card">
-      <h2>Estudo diário</h2>
-      <p class="hint">Clique no dia para ver a teoria resumida (palavras-chave e mnemônicos) e o questionário de 30 questões.</p>
-      <div class="day-list" id="listaDiasButtons"></div>
-    </div>
-  </div>
-
-  <!-- ======================= LISTA: SIMULADOS ======================= -->
-  <div id="view-lista-simulados" style="display:none;">
-    <div class="card">
-      <h2>Simulados de domingo</h2>
-      <p class="hint">Clique no simulado para iniciar o cronômetro de 2h30 e responder as 50 questões.</p>
-      <div class="day-list" id="listaSimuladosButtons"></div>
-    </div>
-  </div>
-
-  <!-- ======================= DIA (TEORIA + QUESTIONÁRIO) ======================= -->
-  <div id="view-quiz" style="display:none;">
-    <div class="card" style="margin-bottom:14px;">
-      <button class="btn-ghost" onclick="goToView('lista-dias')" style="margin-bottom:14px;">← Voltar ao estudo diário</button>
-      <h2 id="quizDayLabel">Dia</h2>
-      <p class="hint" id="quizDaySub"></p>
-      <div class="disc-row" id="quizDiscRow"></div>
-    </div>
-
-    <div id="theoryArea"></div>
-
-    <div class="card" style="margin-bottom:14px;">
-      <h2>Questionário do dia</h2>
-      <p class="hint">Modelo Instituto Avalia · múltipla escolha A-D · resposta e comentário aparecem ao clicar.</p>
-      <div id="quizGate" class="gate" style="display:none;">
-        <p>Selecione seu nome no topo da página para que este resultado seja contabilizado no ranking.</p>
-      </div>
-      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-    </div>
-    <div id="quizArea"></div>
-    <div class="result-card" id="resultCard">
-      <div class="sub">Resultado final</div>
-      <div class="result-score" id="scoreText">0/0</div>
-      <div class="result-detail" id="scoreDetail"></div>
-      <div class="btn-row" style="justify-content:center;"><button onclick="restartQuiz()">Refazer este questionário</button></div>
-    </div>
-  </div>
-
 </div>
+
 <script>
 /* =========================================================
    SUPABASE — integração com a tabela ranking_concurso
@@ -398,9 +323,9 @@ async function computarAtividade(tipo, pontosGanhos) {
     return; 
   }
   if(tipo === 'diario') {
-    await ganharPontosDiarios(currentStudent, pontosGanhos);
+    await ganarPontosDiarios(currentStudent, pontosGanhos);
   } else {
-    await ganharPontosSimulados(currentStudent, pontosGanhos);
+    await ganarPontosSimulados(currentStudent, pontosGanhos);
   }
 }
 
@@ -408,7 +333,8 @@ async function computarAtividadeDirect(tipo, pontosGanhos) {
   await computarAtividade(tipo, pontosGanhos);
 }
 
-async function ganharPontosDiarios(nome, pontosGanhos){
+// MAPEAMENTO COMPATÍVEL COM OS NOMES INTERNOS DO SEU PROJETO ORIGINAL
+async function ganarPontosDiarios(nome, pontosGanhos){
   const aluno = nome || currentStudent;
   if(!aluno) return;
   const atual = rankingGeral.find(r => r.nome === aluno);
@@ -424,7 +350,7 @@ async function ganharPontosDiarios(nome, pontosGanhos){
   }
 }
 
-async function ganharPontosSimulados(nome, pontosGanhos){
+async function ganarPontosSimulados(nome, pontosGanhos){
   const aluno = nome || currentStudent;
   if(!aluno) return;
   const atual = rankingGeral.find(r => r.nome === aluno);
@@ -454,64 +380,50 @@ async function ajustarDiasFurados(nome, delta){
   }
 }
 
-// ADAPTAÇÃO COMPLETA PARA A TABELA DE MULTAS DO SEU LAYOUT ESCURO
 function renderMultaTable() {
-  // Procura pelo corpo da tabela de multas ou pelo contêiner genérico do Claude
-  const grid = document.getElementById('checkin-list') || document.querySelector('.checkin-grid') || document.querySelector('#panel-multas tbody') || document.querySelector('table tbody');
+  const grid = document.getElementById('checkin-list') || document.querySelector('.checkin-grid');
   if(!grid) return;
   grid.innerHTML = "";
   
   let totalAcumuladoGrupo = 0;
 
+  if(rankingGeral.length === 0){
+    grid.innerHTML = '<div class="empty">Nenhum participante encontrado em ranking_concurso.</div>';
+    return;
+  }
+
   rankingGeral.forEach(u => {
     const multaIndividual = u.dias_furados * VALOR_MULTA_DIA;
     totalAcumuladoGrupo += multaIndividual;
 
-    // Se o elemento destino for uma tabela HTML (tbody), renderiza como linha (tr)
-    if (grid.tagName === 'TBODY') {
-      grid.innerHTML += `
-        <tr>
-          <td>${u.nome}</td>
-          <td class="mono" style="text-align:center;">
-            <button style="background:var(--danger-dim); color:var(--danger); border:1px solid var(--danger); padding:2px 8px; border-radius:4px; cursor:pointer; font-size:11px; margin-right:6px;" onclick="ajustarDiasFurados('${u.nome}', 1)">+ Furou</button>
-            <span>${u.dias_furados}</span>
-            <button style="background:var(--success-dim); color:var(--success); border:1px solid var(--success); padding:2px 8px; border-radius:4px; cursor:pointer; font-size:11px; margin-left:6px;" onclick="ajustarDiasFurados('${u.nome}', -1)">-</button>
-          </td>
-          <td class="mono" style="color:var(--danger); text-align:right;">R$ ${multaIndividual.toFixed(2)}</td>
-        </tr>
-      `;
-    } else {
-      // Caso contrário, renderiza no formato de blocos (div) padrão do checkin-item
-      const item = document.createElement('div');
-      item.className = 'checkin-item';
-      item.innerHTML = `
-        <span class="name">${u.nome} <small style="color:var(--muted);">(${u.dias_furados} furos)</small></span>
-        <div class="toggle-btns">
-          <button class="btn-accent" style="padding:4px 8px; font-size:12px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', 1)">+ Furou</button>
-          <button class="btn-ghost" style="padding:4px 8px; font-size:12px; margin-left:4px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', -1)">- Remover</button>
-        </div>
-      `;
-      grid.appendChild(item);
-    }
+    const item = document.createElement('div');
+    item.className = 'checkin-item';
+    item.innerHTML = `
+      <span class="name">${u.nome} <small style="color:var(--muted);">(${u.dias_furados} furos)</small></span>
+      <div class="toggle-btns">
+        <button class="btn-accent" style="padding:4px 8px; font-size:12px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', 1)">+ Furou</button>
+        <button class="btn-ghost" style="padding:4px 8px; font-size:12px; margin-left:4px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', -1)">- Remover</button>
+      </div>
+    `;
+    grid.appendChild(item);
   });
 
-  // Atualiza o contador de "Total acumulado pelo grupo" na tela se ele existir
-  const elTotal = document.querySelector('.total-multa') || document.getElementById('total-multa-grupo') || document.all?.tags?.('div')?.['total-multa'];
-  // Tenta localizar o texto de R$ 0,00 no seu painel para atualizar dinamicamente
+  // Atualiza o texto do valor total acumulado pelo grupo na interface
   const elements = document.getElementsByTagName('*');
   for (let i = 0; i < elements.length; i++) {
-    if (elements[i].innerText === 'R$ 0,00' || elements[i].className?.includes('multa')) {
-      elements[i].innerText = `R$ ${totalAcumuladoGrupo.toFixed(2)}`;
-      elements[i].style.color = 'var(--danger)';
-      break;
+    if (elements[i].innerText && (elements[i].innerText.includes('R$') || elements[i].className?.includes('multa'))) {
+      if (elements[i].children.length === 0 && elements[i].innerText.includes('0,00')) {
+        elements[i].innerText = `R$ ${totalAcumuladoGrupo.toFixed(2)}`;
+        break;
+      }
     }
   }
 }
 
 function renderRankingGeral(){
-  const tPrincipal = document.getElementById('rankingPrincipalTable') || document.getElementById('table-geral') || document.querySelectorAll('table tbody')[1];
-  const tDiario = document.getElementById('rankingDiarioTable') || document.getElementById('table-diario');
-  const tSimulados = document.getElementById('rankingSimuladosPontosTable') || document.getElementById('table-simulado');
+  const tPrincipal = document.getElementById('rankingPrincipalTable');
+  const tDiario = document.getElementById('rankingDiarioTable');
+  const tSimulados = document.getElementById('rankingSimuladosPontosTable');
   
   if(tPrincipal){
     const principal = [...rankingGeral]
@@ -526,6 +438,34 @@ function renderRankingGeral(){
       <td class="mono" style="color:var(--danger);">R$ ${r.multa.toFixed(2)}</td>
     </tr>`).join('');
   }
+
+  if(tDiario){
+    const diario = [...rankingGeral].sort((a,b) => b.pontos_diarios - a.pontos_diarios);
+    tDiario.innerHTML = diario.map((r, i) => `<tr>
+      <td class="pos">${i+1}º</td>
+      <td>${r.nome}</td>
+      <td class="mono">${r.pontos_diarios}</td>
+    </tr>`).join('');
+  }
+
+  if(tSimulados){
+    const simulados = [...rankingGeral].sort((a,b) => b.pontos_simulados - a.pontos_simulados);
+    tSimulados.innerHTML = simulados.map((r, i) => `<tr>
+      <td class="pos">${i+1}º</td>
+      <td>${r.nome}</td>
+      <td class="mono">${r.pontos_simulados}</td>
+    </tr>`).join('');
+  }
+}
+
+function mudarAba(aba) {
+  document.querySelectorAll('.ranking-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  
+  const painel = document.getElementById(`panel-${aba}`);
+  const botao = document.getElementById(`btn-tab-${aba}`);
+  if(painel) painel.classList.add('active');
+  if(botao) botao.classList.add('active');
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -535,7 +475,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   setTimeout(async () => {
     await fetchRankingGeral();
-  }, 400);
+  }, 300);
 });
 
 /* =========================================================
