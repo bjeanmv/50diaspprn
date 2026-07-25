@@ -335,13 +335,21 @@
 const SUPABASE_URL = 'https://crriwqikilyouyaaqdlx.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNycml3cWlraWx5b3V5YWFxZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NjE4MTEsImV4cCI6MjEwMDMzNzgxMX0.9DRHG7Fj2im0RULZACftB2BZYrErF6OakgpOo3dFv6I';
 let supabaseClient = null;
-try{
-  if(!window.supabase) throw new Error('window.supabase indefinido — o script do CDN (jsdelivr) não carregou.');
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-}catch(e){
-  console.error(e);
+
+try {
+  // CORREÇÃO DA INICIALIZAÇÃO DA BIBLIOTECA V2
+  if (typeof supabase !== 'undefined') {
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  } else if (typeof window.supabase !== 'undefined') {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  } else {
+    throw new Error('A biblioteca do Supabase não foi carregada no navegador.');
+  }
+} catch(e) {
+  console.error("Erro ao inicializar Supabase:", e);
   supabaseClient = null;
 }
+
 const VALOR_MULTA_DIA = 1.00; // R$ por dia furado
 
 let MEMBERS = [];          // nomes, vindos de ranking_concurso.nome
@@ -356,8 +364,9 @@ async function fetchRankingGeral(){
   }
   const { data, error } = await supabaseClient.from('ranking_concurso')
     .select('nome, pontos_diarios, pontos_simulados, dias_furados');
-  console.error(error); // log explícito pedido: null quando não há erro, objeto de erro quando há
+  
   if(error){
+    console.error("Erro na leitura:", error);
     mostrarErroSupabase('Falha ao LER ranking_concurso: ' + error.message + (error.hint ? (' — dica: ' + error.hint) : ''));
     rankingGeral = [];
     MEMBERS = [];
@@ -375,6 +384,20 @@ async function fetchRankingGeral(){
     dias_furados: r.dias_furados || 0
   }));
   MEMBERS = rankingGeral.map(r => r.nome);
+  
+  // ALIMENTA A LISTA SUSPENSA DE PARTICIPANTES DINAMICAMENTE SE ELA EXISTIR
+  const selectEstudante = document.getElementById('student-select') || document.getElementById('user-select');
+  if (selectEstudante) {
+    const valorAtual = selectEstudante.value;
+    selectEstudante.innerHTML = '<option value="">-- Escolha seu Nome --</option>';
+    MEMBERS.forEach(nome => {
+      const opt = document.createElement('option');
+      opt.value = nome;
+      opt.innerText = nome;
+      if(nome === valorAtual) opt.selected = true;
+      selectEstudante.appendChild(opt);
+    });
+  }
 }
 
 function mostrarErroSupabase(msg){
@@ -394,8 +417,7 @@ async function ganharPontosDiarios(nome, pontosGanhos){
   const atual = rankingGeral.find(r => r.nome === nome);
   const novoTotal = (atual ? atual.pontos_diarios : 0) + pontosGanhos;
   const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, pontos_diarios: novoTotal }, { onConflict: 'nome' });
-  console.error(error);
-  if(error){ mostrarErroSupabase('Falha ao SALVAR pontos_diarios de "' + nome + '": ' + error.message); return; }
+  if(error){ console.error(error); mostrarErroSupabase('Falha ao SALVAR pontos_diarios de "' + nome + '": ' + error.message); return; }
   await fetchRankingGeral();
   renderRankingGeral();
 }
@@ -406,8 +428,7 @@ async function ganharPontosSimulados(nome, pontosGanhos){
   const atual = rankingGeral.find(r => r.nome === nome);
   const novoTotal = (atual ? atual.pontos_simulados : 0) + pontosGanhos;
   const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, pontos_simulados: novoTotal }, { onConflict: 'nome' });
-  console.error(error);
-  if(error){ mostrarErroSupabase('Falha ao SALVAR pontos_simulados de "' + nome + '": ' + error.message); return; }
+  if(error){ console.error(error); mostrarErroSupabase('Falha ao SALVAR pontos_simulados de "' + nome + '": ' + error.message); return; }
   await fetchRankingGeral();
   renderRankingGeral();
 }
@@ -418,17 +439,17 @@ async function ajustarDiasFurados(nome, delta){
   const atual = rankingGeral.find(r => r.nome === nome);
   const novoTotal = Math.max(0, (atual ? atual.dias_furados : 0) + delta);
   const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, dias_furados: novoTotal }, { onConflict: 'nome' });
-  console.error(error);
-  if(error){ mostrarErroSupabase('Falha ao SALVAR dias_furados de "' + nome + '": ' + error.message); return; }
+  if(error){ console.error(error); mostrarErroSupabase('Falha ao SALVAR dias_furados de "' + nome + '": ' + error.message); return; }
   await fetchRankingGeral();
   renderRankingGeral();
-  renderMultaTable();
+  if (typeof renderMultaTable === 'function') renderMultaTable();
+  if (typeof renderAdminPanel === 'function') renderAdminPanel();
 }
 
 function renderRankingGeral(){
-  const tPrincipal = document.getElementById('rankingPrincipalTable');
-  const tDiario = document.getElementById('rankingDiarioTable');
-  const tSimulados = document.getElementById('rankingSimuladosPontosTable');
+  const tPrincipal = document.getElementById('rankingPrincipalTable') || document.getElementById('table-geral');
+  const tDiario = document.getElementById('rankingDiarioTable') || document.getElementById('table-diario');
+  const tSimulados = document.getElementById('rankingSimuladosPontosTable') || document.getElementById('table-simulado');
   if(!tPrincipal && !tDiario && !tSimulados) return;
 
   if(rankingGeral.length === 0){
@@ -473,6 +494,27 @@ function renderRankingGeral(){
 }
 let currentStudent = null;
 
+// GATILHO DE ATUALIZAÇÃO DO USUÁRIO SELECIONADO
+function selecionarUsuario() {
+  const select = document.getElementById('student-select') || document.getElementById('user-select');
+  if(select) {
+    currentStudent = select.value;
+    renderRankingGeral();
+  }
+}
+
+// INICIALIZAÇÃO CORRETA AO CARREGAR A PÁGINA
+window.addEventListener('DOMContentLoaded', async () => {
+  await fetchRankingGeral();
+  renderRankingGeral();
+  
+  // Vincula a função de mudança da lista suspensa caso o Claude mude o id
+  const select = document.getElementById('student-select') || document.getElementById('user-select');
+  if(select) {
+    select.addEventListener('change', selecionarUsuario);
+  }
+});
+
 /* =========================================================
    CONTEÚDO POR DIA — teoria + questionário.
    Para adicionar um novo dia, acrescente uma chave (ex: 2)
@@ -489,6 +531,7 @@ const QUIZZES = {
         palavrasChave: ["Servidor", "Cargo público", "Classe", "Categoria funcional", "Grupo", "Quadro", "Isolado", "Carreira", "Provimento efetivo", "Comissão", "Mandato revogável", "Desvio de função"],
         paragrafos: [
           "A LC 122/1994 institui o <b>Estatuto</b> dos servidores públicos civis do Estado do RN. O Título I (Art. 1º a 3º) traz as definições-base: <b>servidor</b> é a pessoa investida em cargo; <b>cargo público</b> é o conjunto de atribuições — não confunda os dois.",
+
           "Os agrupamentos crescem em escala: <b>classe → categoria funcional → grupo → quadro</b>. Classe agrupa cargos; categoria funcional agrupa classes; grupo agrupa cargos isolados e categorias afins; quadro é o conjunto de todos os cargos de um Poder ou órgão.",
           "O §1º do Art. 2º separa os cargos em 4 tipos: <b>isolado</b>, <b>de carreira</b>, <b>de provimento efetivo</b> e <b>em comissão</b>. Isolado e carreira falam da estrutura do cargo; efetivo e comissão falam da forma de provimento (a diferença entre eles é o que a banca mais testa).",
           "O <b>mandato</b> (função por tempo limitado) é sempre revogável, mesmo quando preenchido por eleição, salvo disposição em contrário — regra que costuma ser invertida em questões de Certo/Errado.",
