@@ -322,11 +322,12 @@
     </div>
   </div>
 
-</div><script>
+</div>
+<script>
 /* =========================================================
    SUPABASE — integração com a tabela ranking_concurso
    ========================================================= */
-const SUPABASE_URL = 'https://crriwqikilyouyaaqdlx.supabase.co';
+const SUPABASE_URL = 'https://supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNycml3cWlraWx5b3V5YWFxZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NjE4MTEsImV4cCI6MjEwMDMzNzgxMX0.9DRHG7Fj2im0RULZACftB2BZYrErF6OakgpOo3dFv6I';
 let supabaseClient = null;
 
@@ -336,7 +337,7 @@ try {
   } else if (window.supabase) {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   }
-} catch(e) {
+} catch(e){
   console.error("Erro na inicialização:", e);
 }
 
@@ -363,7 +364,7 @@ async function fetchRankingGeral(){
     renderMultaTable();
     renderRankingGeral();
   } catch(err) {
-    console.error("Falha na rede ao ler dados:", err);
+    console.error("Falha ao ler dados:", err);
   }
 }
 
@@ -388,11 +389,29 @@ function selecionarUsuario() {
   }
 }
 
+// CORREÇÃO ESSENCIAL: FUNÇÃO "PONTE" PARA ADAPTAR OS BOTÕES DO CLAUDE (UNIFICADA)
+async function computarAtividade(tipo, pontosGanhos) {
+  if(!currentStudent) { 
+    alert("Selecione seu nome na lista suspensa do topo primeiro!"); 
+    return; 
+  }
+  if(tipo === 'diario') {
+    await ganharPontosDiarios(currentStudent, pontosGanhos);
+  } else {
+    await ganharPontosSimulados(currentStudent, pontosGanhos);
+  }
+}
+
+// FUNÇÃO COMPATÍVEL COM OUTRAS VERSÕES DE BOTÕES DO SEU HTML
+async function computarAtividadeDirect(tipo, pontosGanhos) {
+  await computarAtividade(tipo, pontosGanhos);
+}
+
 async function ganharPontosDiarios(nome, pontosGanhos){
   const aluno = nome || currentStudent;
-  if(!aluno) { alert("Selecione seu nome na lista do topo primeiro!"); return; }
+  if(!aluno) return;
   const atual = rankingGeral.find(r => r.nome === aluno);
-  const novoTotal = (atual ? (atual.pontos_diarios || 0) : 0) + (pontosGanhos || 10);
+  const novoTotal = (atual ? (atual.pontos_diarios || 0) : 0) + pontosGanhos;
   
   try {
     const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: aluno, pontos_diarios: novoTotal }, { onConflict: 'nome' });
@@ -406,9 +425,9 @@ async function ganharPontosDiarios(nome, pontosGanhos){
 
 async function ganharPontosSimulados(nome, pontosGanhos){
   const aluno = nome || currentStudent;
-  if(!aluno) { alert("Selecione seu nome na lista do topo primeiro!"); return; }
+  if(!aluno) return;
   const atual = rankingGeral.find(r => r.nome === aluno);
-  const novoTotal = (atual ? (atual.pontos_simulados || 0) : 0) + (pontosGanhos || 50);
+  const novoTotal = (atual ? (atual.pontos_simulados || 0) : 0) + pontosGanhos;
   
   try {
     const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: aluno, pontos_simulados: novoTotal }, { onConflict: 'nome' });
@@ -444,8 +463,8 @@ function renderMultaTable() {
     item.innerHTML = `
       <span class="name">${u.nome} <small style="color:var(--muted);">(${u.dias_furados} furos)</small></span>
       <div class="toggle-btns">
-        <button class="btn-accent" style="padding:4px 8px; font-size:12px;" onclick="ajustarDiasFurados('${u.nome}', 1)">+ Furou</button>
-        <button class="btn-ghost" style="padding:4px 8px; font-size:12px; margin-left:4px;" onclick="ajustarDiasFurados('${u.nome}', -1)">- Remover</button>
+        <button class="btn-accent" style="padding:4px 8px; font-size:12px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', 1)">+ Furou</button>
+        <button class="btn-ghost" style="padding:4px 8px; font-size:12px; margin-left:4px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', -1)">- Remover</button>
       </div>
     `;
     grid.appendChild(item);
@@ -497,7 +516,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   setTimeout(async () => {
     await fetchRankingGeral();
-  }, 1000);
+  }, 500);
 });
 
 /* =========================================================
