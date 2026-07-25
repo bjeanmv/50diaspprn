@@ -322,90 +322,60 @@
     </div>
   </div>
 
-</div>
-<script>
+</div><script>
 /* =========================================================
    SUPABASE — integração com a tabela ranking_concurso
-   (colunas: nome, pontos_diarios, pontos_simulados, dias_furados)
    ========================================================= */
-const SUPABASE_URL = 'https://supabase.co';
+const SUPABASE_URL = 'https://crriwqikilyouyaaqdlx.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNycml3cWlraWx5b3V5YWFxZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NjE4MTEsImV4cCI6MjEwMDMzNzgxMX0.9DRHG7Fj2im0RULZACftB2BZYrErF6OakgpOo3dFv6I';
 let supabaseClient = null;
 
-try{
-  if(typeof supabase !== 'undefined') {
-    // INICIALIZAÇÃO BLINDADA FORÇANDO OS HEADERS GLOBAIS DE SEGURANÇA
-    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-      auth: { persistSession: false },
-      global: { headers: { 'apikey': SUPABASE_KEY } }
-    });
-  } else if(window.supabase) {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-      auth: { persistSession: false },
-      global: { headers: { 'apikey': SUPABASE_KEY } }
-    });
-  } else {
-    throw new Error('window.supabase indefinido — o script do CDN não carregou.');
+try {
+  if (typeof supabase !== 'undefined') {
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  } else if (window.supabase) {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   }
-}catch(e){
-  console.error(e);
-  supabaseClient = null;
+} catch(e) {
+  console.error("Erro na inicialização:", e);
 }
-const VALOR_MULTA_DIA = 1.00; // R$ por dia furado
 
-let MEMBERS = [];          // nomes, vindos de ranking_concurso.nome
-let rankingGeral = [];     // [{nome, pontos_diarios, pontos_simulados, dias_furados}]
+const VALOR_MULTA_DIA = 1.00;
+let MEMBERS = [];          
+let rankingGeral = [];     
 let currentStudent = null;
 
 async function fetchRankingGeral(){
-  if(!supabaseClient){
-    mostrarErroSupabase('Biblioteca do Supabase não carregou.');
-    rankingGeral = [];
-    MEMBERS = [];
-    return;
+  if(!supabaseClient) return;
+  try {
+    const { data, error } = await supabaseClient.from('ranking_concurso').select('*');
+    if(error) throw error;
+    
+    rankingGeral = (data || []).map(r => ({
+      nome: r.nome,
+      pontos_diarios: r.pontos_diarios || 0,
+      pontos_simulados: r.pontos_simulados || 0,
+      dias_furados: r.dias_furados || 0
+    }));
+    MEMBERS = rankingGeral.map(r => r.nome);
+    
+    renderizarSelecaoUsuarios();
+    renderMultaTable();
+    renderRankingGeral();
+  } catch(err) {
+    console.error("Falha na rede ao ler dados:", err);
   }
-  const { data, error } = await supabaseClient.from('ranking_concurso')
-    .select('nome, pontos_diarios, pontos_simulados, dias_furados');
-  
-  if(error){
-    console.error(error);
-    mostrarErroSupabase('Falha ao LER ranking_concurso: ' + error.message);
-    return;
-  }
-  limparErroSupabase();
-  
-  rankingGeral = (data || []).map(r => ({
-    nome: r.nome,
-    pontos_diarios: r.pontos_diarios || 0,
-    pontos_simulados: r.pontos_simulados || 0,
-    dias_furados: r.dias_furados || 0
-  }));
-  MEMBERS = rankingGeral.map(r => r.nome);
-  
-  renderizarSelecaoUsuarios();
-  renderMultaTable();
-}
-
-function mostrarErroSupabase(msg){
-  const el = document.getElementById('supabaseStatus');
-  if(!el) return;
-  el.style.display = '';
-  el.innerHTML = '<p><b>⚠ Problema de conexão com o Supabase:</b><br>' + msg + '</p>';
-}
-function limparErroSupabase(){
-  const el = document.getElementById('supabaseStatus');
-  if(el) el.style.display = 'none';
 }
 
 function renderizarSelecaoUsuarios() {
   const select = document.getElementById('user-select') || document.getElementById('student-select');
   if(!select) return;
+  const valorAtual = select.value;
   select.innerHTML = '<option value="">-- Escolha seu Nome --</option>';
   MEMBERS.forEach(nome => {
     const opt = document.createElement('option');
-    opt.value = nome;
-    opt.innerText = nome;
-    if(nome === currentStudent) opt.selected = true;
+    opt.value = nome; opt.innerText = nome;
+    if(nome === valorAtual || nome === currentStudent) opt.selected = true;
     select.appendChild(opt);
   });
 }
@@ -420,68 +390,62 @@ function selecionarUsuario() {
 
 async function ganharPontosDiarios(nome, pontosGanhos){
   const aluno = nome || currentStudent;
-  if(!aluno || !pontosGanhos) { alert("Selecione seu nome primeiro!"); return; }
-  if(!supabaseClient){ alert('Sem conexão com o Supabase.'); return; }
-  
+  if(!aluno) { alert("Selecione seu nome na lista do topo primeiro!"); return; }
   const atual = rankingGeral.find(r => r.nome === aluno);
-  const novoTotal = (atual ? atual.pontos_diarios : 0) + pontosGanhos;
+  const novoTotal = (atual ? (atual.pontos_diarios || 0) : 0) + (pontosGanhos || 10);
   
-  const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: aluno, pontos_diarios: novoTotal }, { onConflict: 'nome' });
-  if(error){ console.error(error); alert('Erro ao salvar pontos.'); return; }
-  
-  alert('Pontos diários salvos com sucesso!');
-  await fetchRankingGeral();
-  renderRankingGeral();
+  try {
+    const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: aluno, pontos_diarios: novoTotal }, { onConflict: 'nome' });
+    if(error) throw error;
+    alert('Pontos diários salvos com sucesso!');
+    await fetchRankingGeral();
+  } catch(err) {
+    console.error(err);
+  }
 }
 
-async function ganarPontosSimulados(nome, pontosGanhos){
+async function ganharPontosSimulados(nome, pontosGanhos){
   const aluno = nome || currentStudent;
-  if(!aluno || !pontosGanhos) { alert("Selecione seu nome primeiro!"); return; }
-  if(!supabaseClient){ alert('Sem conexão com o Supabase.'); return; }
-  
+  if(!aluno) { alert("Selecione seu nome na lista do topo primeiro!"); return; }
   const atual = rankingGeral.find(r => r.nome === aluno);
-  const novoTotal = (atual ? atual.pontos_simulados : 0) + pontosGanhos;
+  const novoTotal = (atual ? (atual.pontos_simulados || 0) : 0) + (pontosGanhos || 50);
   
-  const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: aluno, pontos_simulados: novoTotal }, { onConflict: 'nome' });
-  if(error){ console.error(error); alert('Erro ao salvar pontos.'); return; }
-  
-  alert('Pontos do simulado salvos com sucesso!');
-  await fetchRankingGeral();
-  renderRankingGeral();
+  try {
+    const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: aluno, pontos_simulados: novoTotal }, { onConflict: 'nome' });
+    if(error) throw error;
+    alert('Pontos do simulado salvos com sucesso!');
+    await fetchRankingGeral();
+  } catch(err) {
+    console.error(err);
+  }
 }
 
 async function ajustarDiasFurados(nome, delta){
-  if(!nome || !delta) return;
-  if(!supabaseClient){ console.error('Sem conexão.'); return; }
-  
+  if(!nome) return;
   const atual = rankingGeral.find(r => r.nome === nome);
-  const novoTotal = Math.max(0, (atual ? atual.dias_furados : 0) + delta);
+  const novoTotal = Math.max(0, (atual ? (atual.dias_furados || 0) : 0) + delta);
   
-  const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, dias_furados: novoTotal }, { onConflict: 'nome' });
-  if(error){ console.error(error); return; }
-  
-  await fetchRankingGeral();
-  renderRankingGeral();
+  try {
+    const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, dias_furados: novoTotal }, { onConflict: 'nome' });
+    if(error) throw error;
+    await fetchRankingGeral();
+  } catch(err) {
+    console.error(err);
+  }
 }
 
 function renderMultaTable() {
   const grid = document.getElementById('checkin-list');
   if(!grid) return;
   grid.innerHTML = "";
-  
-  if(rankingGeral.length === 0){
-    grid.innerHTML = '<div class="empty">Nenhum participante listado.</div>';
-    return;
-  }
-  
   rankingGeral.forEach(u => {
     const item = document.createElement('div');
     item.className = 'checkin-item';
     item.innerHTML = `
-      <span class="name">${u.nome} <small style="color:var(--muted); font-weight:400;">(${u.dias_furados} furos)</small></span>
+      <span class="name">${u.nome} <small style="color:var(--muted);">(${u.dias_furados} furos)</small></span>
       <div class="toggle-btns">
-        <button class="btn-furou" style="background:var(--danger-dim);color:var(--danger);border:1px solid var(--danger);padding:4px 8px;border-radius:4px;cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', 1)">+ Furou</button>
-        <button class="btn-ok" style="background:var(--success-dim);color:var(--success);border:1px solid var(--success);padding:4px 8px;border-radius:4px;cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', -1)">- Remover</button>
+        <button class="btn-accent" style="padding:4px 8px; font-size:12px;" onclick="ajustarDiasFurados('${u.nome}', 1)">+ Furou</button>
+        <button class="btn-ghost" style="padding:4px 8px; font-size:12px; margin-left:4px;" onclick="ajustarDiasFurados('${u.nome}', -1)">- Remover</button>
       </div>
     `;
     grid.appendChild(item);
@@ -492,14 +456,7 @@ function renderRankingGeral(){
   const tPrincipal = document.getElementById('rankingPrincipalTable') || document.getElementById('table-geral');
   const tDiario = document.getElementById('rankingDiarioTable') || document.getElementById('table-diario');
   const tSimulados = document.getElementById('rankingSimuladosPontosTable') || document.getElementById('table-simulado');
-  if(!tPrincipal && !tDiario && !tSimulados) return;
-
-  if(rankingGeral.length === 0){
-    const vazio = '<tr><td colspan="6" class="empty">Nenhum participante encontrado.</td></tr>';
-    if(tPrincipal) tPrincipal.innerHTML = vazio;
-    return;
-  }
-
+  
   if(tPrincipal){
     const principal = [...rankingGeral]
       .map(r => ({ ...r, total: r.pontos_diarios + r.pontos_simulados, multa: r.dias_furados * VALOR_MULTA_DIA }))
@@ -517,8 +474,8 @@ function renderRankingGeral(){
   if(tDiario){
     const diario = [...rankingGeral].sort((a,b) => b.pontos_diarios - a.pontos_diarios);
     tDiario.innerHTML = diario.map((r, i) => `<tr>
-      <td class="pos ${i===0 ? 'gold' : ''}">${i+1}º</td>
-      <td>${r.nome}${r.nome===currentStudent ? ' <span class="pill ok">você</span>' : ''}</td>
+      <td class="pos">${i+1}º</td>
+      <td>${r.nome}</td>
       <td class="mono">${r.pontos_diarios}</td>
     </tr>`).join('');
   }
@@ -526,14 +483,13 @@ function renderRankingGeral(){
   if(tSimulados){
     const simulados = [...rankingGeral].sort((a,b) => b.pontos_simulados - a.pontos_simulados);
     tSimulados.innerHTML = simulados.map((r, i) => `<tr>
-      <td class="pos ${i===0 ? 'gold' : ''}">${i+1}º</td>
-      <td>${r.nome}${r.nome===currentStudent ? ' <span class="pill ok">você</span>' : ''}</td>
+      <td class="pos">${i+1}º</td>
+      <td>${r.nome}</td>
       <td class="mono">${r.pontos_simulados}</td>
     </tr>`).join('');
   }
 }
 
-// CARREGAMENTO SEGURO COM ATRASO DE REDE PARA EVITAR NETWORK ERROR
 window.addEventListener('DOMContentLoaded', () => {
   const select = document.getElementById('user-select') || document.getElementById('student-select');
   if(select) {
@@ -541,7 +497,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   setTimeout(async () => {
     await fetchRankingGeral();
-  }, 1500);
+  }, 1000);
 });
 
 /* =========================================================
