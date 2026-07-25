@@ -115,8 +115,8 @@
   .result-detail{color:var(--muted);font-size:13.5px;}
 
   @media (max-width:520px){.timer-display{font-size:42px;} h1{font-size:19px;}}
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div class="wrap">
@@ -250,20 +250,21 @@
 
 <script>
 /* =========================================================
-   SUPABASE — integração com a tabela ranking_concurso
+   SUPABASE — integração estável com a tabela ranking_concurso
    ========================================================= */
-const SUPABASE_URL = 'https://supabase.co';
+const SUPABASE_URL = 'https://crriwqikilyouyaaqdlx.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNycml3cWlraWx5b3V5YWFxZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NjE4MTEsImV4cCI6MjEwMDMzNzgxMX0.9DRHG7Fj2im0RULZACftB2BZYrErF6OakgpOo3dFv6I';
 let supabaseClient = null;
 
 try {
+  // Executa validação de fallback caso a janela carregue em ordens distintas
   if (typeof supabase !== 'undefined') {
     supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   } else if (window.supabase) {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   }
-} catch(e){
-  console.error("Erro na inicialização:", e);
+} catch(e) {
+  console.error("Falha ao inicializar o construtor do Supabase:", e);
 }
 
 const VALOR_MULTA_DIA = 1.00;
@@ -272,7 +273,10 @@ let rankingGeral = [];
 let currentStudent = null;
 
 async function fetchRankingGeral(){
-  if(!supabaseClient) return;
+  if(!supabaseClient) {
+    console.error("O cliente do Supabase não está pronto para chamadas de API.");
+    return;
+  }
   try {
     const { data, error } = await supabaseClient.from('ranking_concurso').select('*');
     if(error) throw error;
@@ -289,7 +293,7 @@ async function fetchRankingGeral(){
     renderMultaTable();
     renderRankingGeral();
   } catch(err) {
-    console.error("Falha ao ler dados:", err);
+    console.error("Erro crítico na requisição de dados:", err);
   }
 }
 
@@ -319,13 +323,13 @@ async function computarAtividade(tipo, pontosGanhos) {
   if(select) currentStudent = select.value;
 
   if(!currentStudent) { 
-    alert("Selecione seu nome no campo 'Aluno' no topo primeiro!"); 
+    alert("Por favor, selecione seu nome no campo 'Aluno' no topo antes de marcar pontos!"); 
     return; 
   }
   if(tipo === 'diario') {
-    await ganarPontosDiarios(currentStudent, pontosGanhos);
+    await ganharPontosDiarios(currentStudent, pontosGanhos);
   } else {
-    await ganarPontosSimulados(currentStudent, pontosGanhos);
+    await ganharPontosSimulados(currentStudent, pontosGanhos);
   }
 }
 
@@ -333,8 +337,7 @@ async function computarAtividadeDirect(tipo, pontosGanhos) {
   await computarAtividade(tipo, pontosGanhos);
 }
 
-// MAPEAMENTO COMPATÍVEL COM OS NOMES INTERNOS DO SEU PROJETO ORIGINAL
-async function ganarPontosDiarios(nome, pontosGanhos){
+async function ganharPontosDiarios(nome, pontosGanhos){
   const aluno = nome || currentStudent;
   if(!aluno) return;
   const atual = rankingGeral.find(r => r.nome === aluno);
@@ -343,14 +346,14 @@ async function ganarPontosDiarios(nome, pontosGanhos){
   try {
     const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: aluno, pontos_diarios: novoTotal }, { onConflict: 'nome' });
     if(error) throw error;
-    alert('Progresso diário salvo com sucesso!');
+    alert('Pontos diários gravados com sucesso!');
     await fetchRankingGeral();
   } catch(err) {
     console.error(err);
   }
 }
 
-async function ganarPontosSimulados(nome, pontosGanhos){
+async function ganharPontosSimulados(nome, pontosGanhos){
   const aluno = nome || currentStudent;
   if(!aluno) return;
   const atual = rankingGeral.find(r => r.nome === aluno);
@@ -359,7 +362,7 @@ async function ganarPontosSimulados(nome, pontosGanhos){
   try {
     const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: aluno, pontos_simulados: novoTotal }, { onConflict: 'nome' });
     if(error) throw error;
-    alert('Pontos do simulado salvos com sucesso!');
+    alert('Pontos do simulado gravados com sucesso!');
     await fetchRankingGeral();
   } catch(err) {
     console.error(err);
@@ -381,39 +384,51 @@ async function ajustarDiasFurados(nome, delta){
 }
 
 function renderMultaTable() {
-  const grid = document.getElementById('checkin-list') || document.querySelector('.checkin-grid');
+  // Tenta localizar de maneira flexível a tabela ou container de faltas do Claude
+  const grid = document.getElementById('checkin-list') || document.querySelector('.checkin-grid') || document.querySelector('table tbody') || document.querySelector('#panel-multas tbody');
   if(!grid) return;
   grid.innerHTML = "";
   
   let totalAcumuladoGrupo = 0;
 
-  if(rankingGeral.length === 0){
-    grid.innerHTML = '<div class="empty">Nenhum participante encontrado em ranking_concurso.</div>';
-    return;
-  }
-
   rankingGeral.forEach(u => {
     const multaIndividual = u.dias_furados * VALOR_MULTA_DIA;
     totalAcumuladoGrupo += multaIndividual;
 
-    const item = document.createElement('div');
-    item.className = 'checkin-item';
-    item.innerHTML = `
-      <span class="name">${u.nome} <small style="color:var(--muted);">(${u.dias_furados} furos)</small></span>
-      <div class="toggle-btns">
-        <button class="btn-accent" style="padding:4px 8px; font-size:12px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', 1)">+ Furou</button>
-        <button class="btn-ghost" style="padding:4px 8px; font-size:12px; margin-left:4px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', -1)">- Remover</button>
-      </div>
-    `;
-    grid.appendChild(item);
+    // Se o elemento destino no HTML for o tbody de uma tabela, gera tr
+    if (grid.tagName === 'TBODY') {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${u.nome}</td>
+        <td class="mono" style="text-align:center;">
+          <button style="background:var(--danger-dim); color:var(--danger); border:1px solid var(--danger); padding:3px 8px; border-radius:4px; cursor:pointer; font-size:11px;" onclick="ajustarDiasFurados('${u.nome}', 1)">+ Furou</button>
+          <span style="margin: 0 8px;">${u.dias_furados}</span>
+          <button style="background:var(--success-dim); color:var(--success); border:1px solid var(--success); padding:3px 8px; border-radius:4px; cursor:pointer; font-size:11px;" onclick="ajustarDiasFurados('${u.nome}', -1)">-</button>
+        </td>
+        <td class="mono" style="color:var(--danger); text-align:right;">R$ ${multaIndividual.toFixed(2)}</td>
+      `;
+      grid.appendChild(tr);
+    } else {
+      // Se for div, renderiza no formato de blocos flexíveis
+      const item = document.createElement('div');
+      item.className = 'checkin-item';
+      item.innerHTML = `
+        <span class="name">${u.nome} <small style="color:var(--muted);">(${u.dias_furados} furos)</small></span>
+        <div class="toggle-btns">
+          <button class="btn-accent" style="padding:4px 8px; font-size:12px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', 1)">+ Furou</button>
+          <button class="btn-ghost" style="padding:4px 8px; font-size:12px; margin-left:4px; cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', -1)">- Remover</button>
+        </div>
+      `;
+      grid.appendChild(item);
+    }
   });
 
-  // Atualiza o texto do valor total acumulado pelo grupo na interface
-  const elements = document.getElementsByTagName('*');
-  for (let i = 0; i < elements.length; i++) {
-    if (elements[i].innerText && (elements[i].innerText.includes('R$') || elements[i].className?.includes('multa'))) {
-      if (elements[i].children.length === 0 && elements[i].innerText.includes('0,00')) {
-        elements[i].innerText = `R$ ${totalAcumuladoGrupo.toFixed(2)}`;
+  // Localiza e atualiza dinamicamente o campo numérico vermelho de multa global do grupo
+  const tagsTotais = document.getElementsByTagName('*');
+  for (let i = 0; i < tagsTotais.length; i++) {
+    if (tagsTotais[i].innerText && (tagsTotais[i].innerText.includes('0,00') || tagsTotais[i].className?.includes('multa'))) {
+      if (tagsTotais[i].children.length === 0) {
+        tagsTotais[i].innerText = `R$ ${totalAcumuladoGrupo.toFixed(2)}`;
         break;
       }
     }
@@ -421,9 +436,9 @@ function renderMultaTable() {
 }
 
 function renderRankingGeral(){
-  const tPrincipal = document.getElementById('rankingPrincipalTable');
-  const tDiario = document.getElementById('rankingDiarioTable');
-  const tSimulados = document.getElementById('rankingSimuladosPontosTable');
+  const tPrincipal = document.getElementById('rankingPrincipalTable') || document.getElementById('table-geral');
+  const tDiario = document.getElementById('rankingDiarioTable') || document.getElementById('table-diario');
+  const tSimulados = document.getElementById('rankingSimuladosPontosTable') || document.getElementById('table-simulado');
   
   if(tPrincipal){
     const principal = [...rankingGeral]
@@ -458,21 +473,12 @@ function renderRankingGeral(){
   }
 }
 
-function mudarAba(aba) {
-  document.querySelectorAll('.ranking-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  
-  const painel = document.getElementById(`panel-${aba}`);
-  const botao = document.getElementById(`btn-tab-${aba}`);
-  if(painel) painel.classList.add('active');
-  if(botao) botao.classList.add('active');
-}
-
 window.addEventListener('DOMContentLoaded', () => {
   const select = document.getElementById('user-select') || document.getElementById('student-select') || document.querySelector('select');
   if(select) {
     select.addEventListener('change', selecionarUsuario);
   }
+  // Aguarda um pequeno delay de fôlego para o DOM estabilizar
   setTimeout(async () => {
     await fetchRankingGeral();
   }, 300);
