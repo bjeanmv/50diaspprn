@@ -334,9 +334,16 @@ let supabaseClient = null;
 
 try{
   if(typeof supabase !== 'undefined') {
-    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // INICIALIZAÇÃO BLINDADA FORÇANDO OS HEADERS GLOBAIS DE SEGURANÇA
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { persistSession: false },
+      global: { headers: { 'apikey': SUPABASE_KEY } }
+    });
   } else if(window.supabase) {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { persistSession: false },
+      global: { headers: { 'apikey': SUPABASE_KEY } }
+    });
   } else {
     throw new Error('window.supabase indefinido — o script do CDN não carregou.');
   }
@@ -526,12 +533,15 @@ function renderRankingGeral(){
   }
 }
 
-window.addEventListener('DOMContentLoaded', async () => {
+// CARREGAMENTO SEGURO COM ATRASO DE REDE PARA EVITAR NETWORK ERROR
+window.addEventListener('DOMContentLoaded', () => {
   const select = document.getElementById('user-select') || document.getElementById('student-select');
   if(select) {
     select.addEventListener('change', selecionarUsuario);
   }
-  await fetchRankingGeral();
+  setTimeout(async () => {
+    await fetchRankingGeral();
+  }, 1500);
 });
 
 /* =========================================================
