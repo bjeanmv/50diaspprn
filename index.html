@@ -323,41 +323,36 @@
   </div>
 
 </div>
-
 <script>
-/* =========================================================
-   ALUNOS (lista fixa)
-   ========================================================= */
 /* =========================================================
    SUPABASE — integração com a tabela ranking_concurso
    (colunas: nome, pontos_diarios, pontos_simulados, dias_furados)
    ========================================================= */
-const SUPABASE_URL = 'https://crriwqikilyouyaaqdlx.supabase.co';
+const SUPABASE_URL = 'https://supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNycml3cWlraWx5b3V5YWFxZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NjE4MTEsImV4cCI6MjEwMDMzNzgxMX0.9DRHG7Fj2im0RULZACftB2BZYrErF6OakgpOo3dFv6I';
 let supabaseClient = null;
 
-try {
-  // CORREÇÃO DA INICIALIZAÇÃO DA BIBLIOTECA V2
-  if (typeof supabase !== 'undefined') {
+try{
+  if(typeof supabase !== 'undefined') {
     supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  } else if (typeof window.supabase !== 'undefined') {
+  } else if(window.supabase) {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   } else {
-    throw new Error('A biblioteca do Supabase não foi carregada no navegador.');
+    throw new Error('window.supabase indefinido — o script do CDN não carregou.');
   }
-} catch(e) {
-  console.error("Erro ao inicializar Supabase:", e);
+}catch(e){
+  console.error(e);
   supabaseClient = null;
 }
-
 const VALOR_MULTA_DIA = 1.00; // R$ por dia furado
 
 let MEMBERS = [];          // nomes, vindos de ranking_concurso.nome
 let rankingGeral = [];     // [{nome, pontos_diarios, pontos_simulados, dias_furados}]
+let currentStudent = null;
 
 async function fetchRankingGeral(){
   if(!supabaseClient){
-    mostrarErroSupabase('Biblioteca do Supabase não carregou (CDN jsdelivr indisponível). Rankings via banco ficam desativados, mas o resto do app continua funcionando.');
+    mostrarErroSupabase('Biblioteca do Supabase não carregou.');
     rankingGeral = [];
     MEMBERS = [];
     return;
@@ -366,17 +361,12 @@ async function fetchRankingGeral(){
     .select('nome, pontos_diarios, pontos_simulados, dias_furados');
   
   if(error){
-    console.error("Erro na leitura:", error);
-    mostrarErroSupabase('Falha ao LER ranking_concurso: ' + error.message + (error.hint ? (' — dica: ' + error.hint) : ''));
-    rankingGeral = [];
-    MEMBERS = [];
+    console.error(error);
+    mostrarErroSupabase('Falha ao LER ranking_concurso: ' + error.message);
     return;
   }
-  if((data || []).length === 0){
-    mostrarErroSupabase('Conectado ao Supabase, mas ranking_concurso não retornou nenhuma linha. Confirme se a tabela tem registros e se a Row Level Security permite leitura (SELECT) para a role "anon".');
-  } else {
-    limparErroSupabase();
-  }
+  limparErroSupabase();
+  
   rankingGeral = (data || []).map(r => ({
     nome: r.nome,
     pontos_diarios: r.pontos_diarios || 0,
@@ -385,19 +375,8 @@ async function fetchRankingGeral(){
   }));
   MEMBERS = rankingGeral.map(r => r.nome);
   
-  // ALIMENTA A LISTA SUSPENSA DE PARTICIPANTES DINAMICAMENTE SE ELA EXISTIR
-  const selectEstudante = document.getElementById('student-select') || document.getElementById('user-select');
-  if (selectEstudante) {
-    const valorAtual = selectEstudante.value;
-    selectEstudante.innerHTML = '<option value="">-- Escolha seu Nome --</option>';
-    MEMBERS.forEach(nome => {
-      const opt = document.createElement('option');
-      opt.value = nome;
-      opt.innerText = nome;
-      if(nome === valorAtual) opt.selected = true;
-      selectEstudante.appendChild(opt);
-    });
-  }
+  renderizarSelecaoUsuarios();
+  renderMultaTable();
 }
 
 function mostrarErroSupabase(msg){
@@ -411,39 +390,95 @@ function limparErroSupabase(){
   if(el) el.style.display = 'none';
 }
 
+function renderizarSelecaoUsuarios() {
+  const select = document.getElementById('user-select') || document.getElementById('student-select');
+  if(!select) return;
+  select.innerHTML = '<option value="">-- Escolha seu Nome --</option>';
+  MEMBERS.forEach(nome => {
+    const opt = document.createElement('option');
+    opt.value = nome;
+    opt.innerText = nome;
+    if(nome === currentStudent) opt.selected = true;
+    select.appendChild(opt);
+  });
+}
+
+function selecionarUsuario() {
+  const select = document.getElementById('user-select') || document.getElementById('student-select');
+  if(select) {
+    currentStudent = select.value;
+    renderRankingGeral();
+  }
+}
+
 async function ganharPontosDiarios(nome, pontosGanhos){
-  if(!nome || !pontosGanhos) return;
-  if(!supabaseClient){ mostrarErroSupabase('Sem conexão com o Supabase — pontos_diarios não foram salvos.'); return; }
-  const atual = rankingGeral.find(r => r.nome === nome);
+  const aluno = nome || currentStudent;
+  if(!aluno || !pontosGanhos) { alert("Selecione seu nome primeiro!"); return; }
+  if(!supabaseClient){ alert('Sem conexão com o Supabase.'); return; }
+  
+  const atual = rankingGeral.find(r => r.nome === aluno);
   const novoTotal = (atual ? atual.pontos_diarios : 0) + pontosGanhos;
-  const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, pontos_diarios: novoTotal }, { onConflict: 'nome' });
-  if(error){ console.error(error); mostrarErroSupabase('Falha ao SALVAR pontos_diarios de "' + nome + '": ' + error.message); return; }
+  
+  const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: aluno, pontos_diarios: novoTotal }, { onConflict: 'nome' });
+  if(error){ console.error(error); alert('Erro ao salvar pontos.'); return; }
+  
+  alert('Pontos diários salvos com sucesso!');
   await fetchRankingGeral();
   renderRankingGeral();
 }
 
-async function ganharPontosSimulados(nome, pontosGanhos){
-  if(!nome || !pontosGanhos) return;
-  if(!supabaseClient){ mostrarErroSupabase('Sem conexão com o Supabase — pontos_simulados não foram salvos.'); return; }
-  const atual = rankingGeral.find(r => r.nome === nome);
+async function ganarPontosSimulados(nome, pontosGanhos){
+  const aluno = nome || currentStudent;
+  if(!aluno || !pontosGanhos) { alert("Selecione seu nome primeiro!"); return; }
+  if(!supabaseClient){ alert('Sem conexão com o Supabase.'); return; }
+  
+  const atual = rankingGeral.find(r => r.nome === aluno);
   const novoTotal = (atual ? atual.pontos_simulados : 0) + pontosGanhos;
-  const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, pontos_simulados: novoTotal }, { onConflict: 'nome' });
-  if(error){ console.error(error); mostrarErroSupabase('Falha ao SALVAR pontos_simulados de "' + nome + '": ' + error.message); return; }
+  
+  const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: aluno, pontos_simulados: novoTotal }, { onConflict: 'nome' });
+  if(error){ console.error(error); alert('Erro ao salvar pontos.'); return; }
+  
+  alert('Pontos do simulado salvos com sucesso!');
   await fetchRankingGeral();
   renderRankingGeral();
 }
 
 async function ajustarDiasFurados(nome, delta){
   if(!nome || !delta) return;
-  if(!supabaseClient){ mostrarErroSupabase('Sem conexão com o Supabase — dias_furados não foi salvo.'); return; }
+  if(!supabaseClient){ console.error('Sem conexão.'); return; }
+  
   const atual = rankingGeral.find(r => r.nome === nome);
   const novoTotal = Math.max(0, (atual ? atual.dias_furados : 0) + delta);
+  
   const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, dias_furados: novoTotal }, { onConflict: 'nome' });
-  if(error){ console.error(error); mostrarErroSupabase('Falha ao SALVAR dias_furados de "' + nome + '": ' + error.message); return; }
+  if(error){ console.error(error); return; }
+  
   await fetchRankingGeral();
   renderRankingGeral();
-  if (typeof renderMultaTable === 'function') renderMultaTable();
-  if (typeof renderAdminPanel === 'function') renderAdminPanel();
+}
+
+function renderMultaTable() {
+  const grid = document.getElementById('checkin-list');
+  if(!grid) return;
+  grid.innerHTML = "";
+  
+  if(rankingGeral.length === 0){
+    grid.innerHTML = '<div class="empty">Nenhum participante listado.</div>';
+    return;
+  }
+  
+  rankingGeral.forEach(u => {
+    const item = document.createElement('div');
+    item.className = 'checkin-item';
+    item.innerHTML = `
+      <span class="name">${u.nome} <small style="color:var(--muted); font-weight:400;">(${u.dias_furados} furos)</small></span>
+      <div class="toggle-btns">
+        <button class="btn-furou" style="background:var(--danger-dim);color:var(--danger);border:1px solid var(--danger);padding:4px 8px;border-radius:4px;cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', 1)">+ Furou</button>
+        <button class="btn-ok" style="background:var(--success-dim);color:var(--success);border:1px solid var(--success);padding:4px 8px;border-radius:4px;cursor:pointer;" onclick="ajustarDiasFurados('${u.nome}', -1)">- Remover</button>
+      </div>
+    `;
+    grid.appendChild(item);
+  });
 }
 
 function renderRankingGeral(){
@@ -453,10 +488,8 @@ function renderRankingGeral(){
   if(!tPrincipal && !tDiario && !tSimulados) return;
 
   if(rankingGeral.length === 0){
-    const vazio = '<tr><td colspan="6" class="empty">Nenhum participante encontrado em ranking_concurso.</td></tr>';
+    const vazio = '<tr><td colspan="6" class="empty">Nenhum participante encontrado.</td></tr>';
     if(tPrincipal) tPrincipal.innerHTML = vazio;
-    if(tDiario) tDiario.innerHTML = '<tr><td colspan="3" class="empty">—</td></tr>';
-    if(tSimulados) tSimulados.innerHTML = '<tr><td colspan="3" class="empty">—</td></tr>';
     return;
   }
 
@@ -492,33 +525,17 @@ function renderRankingGeral(){
     </tr>`).join('');
   }
 }
-let currentStudent = null;
 
-// GATILHO DE ATUALIZAÇÃO DO USUÁRIO SELECIONADO
-function selecionarUsuario() {
-  const select = document.getElementById('student-select') || document.getElementById('user-select');
-  if(select) {
-    currentStudent = select.value;
-    renderRankingGeral();
-  }
-}
-
-// INICIALIZAÇÃO CORRETA AO CARREGAR A PÁGINA
 window.addEventListener('DOMContentLoaded', async () => {
-  await fetchRankingGeral();
-  renderRankingGeral();
-  
-  // Vincula a função de mudança da lista suspensa caso o Claude mude o id
-  const select = document.getElementById('student-select') || document.getElementById('user-select');
+  const select = document.getElementById('user-select') || document.getElementById('student-select');
   if(select) {
     select.addEventListener('change', selecionarUsuario);
   }
+  await fetchRankingGeral();
 });
 
 /* =========================================================
    CONTEÚDO POR DIA — teoria + questionário.
-   Para adicionar um novo dia, acrescente uma chave (ex: 2)
-   com label, sub, disciplinas, teoria (blocos) e questions.
    ========================================================= */
 const QUIZZES = {
   1: {
@@ -531,7 +548,6 @@ const QUIZZES = {
         palavrasChave: ["Servidor", "Cargo público", "Classe", "Categoria funcional", "Grupo", "Quadro", "Isolado", "Carreira", "Provimento efetivo", "Comissão", "Mandato revogável", "Desvio de função"],
         paragrafos: [
           "A LC 122/1994 institui o <b>Estatuto</b> dos servidores públicos civis do Estado do RN. O Título I (Art. 1º a 3º) traz as definições-base: <b>servidor</b> é a pessoa investida em cargo; <b>cargo público</b> é o conjunto de atribuições — não confunda os dois.",
-
           "Os agrupamentos crescem em escala: <b>classe → categoria funcional → grupo → quadro</b>. Classe agrupa cargos; categoria funcional agrupa classes; grupo agrupa cargos isolados e categorias afins; quadro é o conjunto de todos os cargos de um Poder ou órgão.",
           "O §1º do Art. 2º separa os cargos em 4 tipos: <b>isolado</b>, <b>de carreira</b>, <b>de provimento efetivo</b> e <b>em comissão</b>. Isolado e carreira falam da estrutura do cargo; efetivo e comissão falam da forma de provimento (a diferença entre eles é o que a banca mais testa).",
           "O <b>mandato</b> (função por tempo limitado) é sempre revogável, mesmo quando preenchido por eleição, salvo disposição em contrário — regra que costuma ser invertida em questões de Certo/Errado.",
