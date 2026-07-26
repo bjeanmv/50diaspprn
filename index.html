@@ -160,7 +160,7 @@
 
     <div class="card">
       <h2>Painel de multas do grupo</h2>
-      <p class="hint">Cada dia furado marcado no check-in soma +1 na coluna de dias furados. Multa fixa: R$ 1,00 por dia furado.</p>
+      <p class="hint">Cada dia furado marcado no check-in soma +1 na coluna <code>dias_furados</code> do Supabase. Multa fixa: R$ 1,00 por dia furado.</p>
       <table>
         <thead>
           <tr><th>Integrante</th><th>Dias furados</th><th>Multa total</th></tr>
@@ -179,7 +179,7 @@
         <p>Selecione seu nome no topo da página para registrar seu check-in.</p>
       </div>
       <div id="checkinFormArea">
-        <p class="hint">Registrando para: <b id="checkinQuemLabel">—</b>. Selecione a data do cronograma e marque se estudou. Marcar "Não estudei" soma +1 em dias furados (uma única vez por dia).</p>
+        <p class="hint">Registrando para: <b id="checkinQuemLabel">—</b>. Selecione a data do cronograma e marque se estudou. Marcar "Não estudei" soma +1 em <code>dias_furados</code> no Supabase (uma única vez por dia).</p>
         <div class="row" style="max-width:260px;">
           <div class="field">
             <label class="field-label" for="checkinData">Data</label>
@@ -200,7 +200,8 @@
   <div id="view-ranking-geral" style="display:none;">
     <div class="card">
       <p class="hint">
-        Todos os dados abaixo atualizam automaticamente sempre que alguém pontua em um questionário diário, em um simulado, ou tem um dia furado registrado.
+        Todos os dados abaixo vêm diretamente da tabela <code>ranking_concurso</code> no Supabase e atualizam automaticamente
+        sempre que alguém pontua em um questionário diário, em um simulado, ou tem um dia furado registrado.
       </p>
       <div class="btn-row">
         <button class="btn-ghost" onclick="fetchRankingGeral().then(renderRankingGeral)">Atualizar agora</button>
@@ -209,7 +210,7 @@
 
     <div class="card">
       <h2>🏆 Ranking Geral (placar principal)</h2>
-      <p class="hint">Soma de pontos dos questionários diários + simulados semanais, do maior para o menor. Inclui o total de multas acumuladas.</p>
+      <p class="hint">Soma de pontos_diarios + pontos_simulados, do maior para o menor. Inclui o total de multas acumuladas.</p>
       <table>
         <thead><tr><th>#</th><th>Integrante</th><th>Pontos diários</th><th>Pontos simulados</th><th>Total de pontos</th><th>Multas</th></tr></thead>
         <tbody id="rankingPrincipalTable"></tbody>
@@ -218,7 +219,7 @@
 
     <div class="card">
       <h2>📘 Ranking Diário</h2>
-      <p class="hint">Ordenado por pontos diários, do maior para o menor.</p>
+      <p class="hint">Ordenado por <code>pontos_diarios</code>, do maior para o menor.</p>
       <table>
         <thead><tr><th>#</th><th>Integrante</th><th>Pontos diários</th></tr></thead>
         <tbody id="rankingDiarioTable"></tbody>
@@ -227,7 +228,7 @@
 
     <div class="card">
       <h2>🕐 Ranking de Simulados</h2>
-      <p class="hint">Ordenado por pontos simulados, do maior para o menor.</p>
+      <p class="hint">Ordenado por <code>pontos_simulados</code>, do maior para o menor.</p>
       <table>
         <thead><tr><th>#</th><th>Integrante</th><th>Pontos simulados</th></tr></thead>
         <tbody id="rankingSimuladosPontosTable"></tbody>
@@ -318,7 +319,6 @@
       <div class="sub">Resultado final</div>
       <div class="result-score" id="scoreText">0/0</div>
       <div class="result-detail" id="scoreDetail"></div>
-      <div class="btn-row" style="justify-content:center;"><button onclick="restartQuiz()">Refazer este questionário</button></div>
     </div>
   </div>
 
@@ -335,21 +335,13 @@
 const SUPABASE_URL = 'https://crriwqikilyouyaaqdlx.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNycml3cWlraWx5b3V5YWFxZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NjE4MTEsImV4cCI6MjEwMDMzNzgxMX0.9DRHG7Fj2im0RULZACftB2BZYrErF6OakgpOo3dFv6I';
 let supabaseClient = null;
-
-try {
-  // CORREÇÃO DA INICIALIZAÇÃO DA BIBLIOTECA V2
-  if (typeof supabase !== 'undefined') {
-    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  } else if (typeof window.supabase !== 'undefined') {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  } else {
-    throw new Error('A biblioteca do Supabase não foi carregada no navegador.');
-  }
-} catch(e) {
-  console.error("Erro ao inicializar Supabase:", e);
+try{
+  if(!window.supabase) throw new Error('window.supabase indefinido — o script do CDN (jsdelivr) não carregou.');
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+}catch(e){
+  console.error(e);
   supabaseClient = null;
 }
-
 const VALOR_MULTA_DIA = 1.00; // R$ por dia furado
 
 let MEMBERS = [];          // nomes, vindos de ranking_concurso.nome
@@ -364,9 +356,8 @@ async function fetchRankingGeral(){
   }
   const { data, error } = await supabaseClient.from('ranking_concurso')
     .select('nome, pontos_diarios, pontos_simulados, dias_furados');
-  
+  console.error(error); // log explícito pedido: null quando não há erro, objeto de erro quando há
   if(error){
-    console.error("Erro na leitura:", error);
     mostrarErroSupabase('Falha ao LER ranking_concurso: ' + error.message + (error.hint ? (' — dica: ' + error.hint) : ''));
     rankingGeral = [];
     MEMBERS = [];
@@ -384,20 +375,6 @@ async function fetchRankingGeral(){
     dias_furados: r.dias_furados || 0
   }));
   MEMBERS = rankingGeral.map(r => r.nome);
-  
-  // ALIMENTA A LISTA SUSPENSA DE PARTICIPANTES DINAMICAMENTE SE ELA EXISTIR
-  const selectEstudante = document.getElementById('student-select') || document.getElementById('user-select');
-  if (selectEstudante) {
-    const valorAtual = selectEstudante.value;
-    selectEstudante.innerHTML = '<option value="">-- Escolha seu Nome --</option>';
-    MEMBERS.forEach(nome => {
-      const opt = document.createElement('option');
-      opt.value = nome;
-      opt.innerText = nome;
-      if(nome === valorAtual) opt.selected = true;
-      selectEstudante.appendChild(opt);
-    });
-  }
 }
 
 function mostrarErroSupabase(msg){
@@ -417,7 +394,8 @@ async function ganharPontosDiarios(nome, pontosGanhos){
   const atual = rankingGeral.find(r => r.nome === nome);
   const novoTotal = (atual ? atual.pontos_diarios : 0) + pontosGanhos;
   const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, pontos_diarios: novoTotal }, { onConflict: 'nome' });
-  if(error){ console.error(error); mostrarErroSupabase('Falha ao SALVAR pontos_diarios de "' + nome + '": ' + error.message); return; }
+  console.error(error);
+  if(error){ mostrarErroSupabase('Falha ao SALVAR pontos_diarios de "' + nome + '": ' + error.message); return; }
   await fetchRankingGeral();
   renderRankingGeral();
 }
@@ -428,7 +406,8 @@ async function ganharPontosSimulados(nome, pontosGanhos){
   const atual = rankingGeral.find(r => r.nome === nome);
   const novoTotal = (atual ? atual.pontos_simulados : 0) + pontosGanhos;
   const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, pontos_simulados: novoTotal }, { onConflict: 'nome' });
-  if(error){ console.error(error); mostrarErroSupabase('Falha ao SALVAR pontos_simulados de "' + nome + '": ' + error.message); return; }
+  console.error(error);
+  if(error){ mostrarErroSupabase('Falha ao SALVAR pontos_simulados de "' + nome + '": ' + error.message); return; }
   await fetchRankingGeral();
   renderRankingGeral();
 }
@@ -439,17 +418,17 @@ async function ajustarDiasFurados(nome, delta){
   const atual = rankingGeral.find(r => r.nome === nome);
   const novoTotal = Math.max(0, (atual ? atual.dias_furados : 0) + delta);
   const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, dias_furados: novoTotal }, { onConflict: 'nome' });
-  if(error){ console.error(error); mostrarErroSupabase('Falha ao SALVAR dias_furados de "' + nome + '": ' + error.message); return; }
+  console.error(error);
+  if(error){ mostrarErroSupabase('Falha ao SALVAR dias_furados de "' + nome + '": ' + error.message); return; }
   await fetchRankingGeral();
   renderRankingGeral();
-  if (typeof renderMultaTable === 'function') renderMultaTable();
-  if (typeof renderAdminPanel === 'function') renderAdminPanel();
+  renderMultaTable();
 }
 
 function renderRankingGeral(){
-  const tPrincipal = document.getElementById('rankingPrincipalTable') || document.getElementById('table-geral');
-  const tDiario = document.getElementById('rankingDiarioTable') || document.getElementById('table-diario');
-  const tSimulados = document.getElementById('rankingSimuladosPontosTable') || document.getElementById('table-simulado');
+  const tPrincipal = document.getElementById('rankingPrincipalTable');
+  const tDiario = document.getElementById('rankingDiarioTable');
+  const tSimulados = document.getElementById('rankingSimuladosPontosTable');
   if(!tPrincipal && !tDiario && !tSimulados) return;
 
   if(rankingGeral.length === 0){
@@ -494,27 +473,6 @@ function renderRankingGeral(){
 }
 let currentStudent = null;
 
-// GATILHO DE ATUALIZAÇÃO DO USUÁRIO SELECIONADO
-function selecionarUsuario() {
-  const select = document.getElementById('student-select') || document.getElementById('user-select');
-  if(select) {
-    currentStudent = select.value;
-    renderRankingGeral();
-  }
-}
-
-// INICIALIZAÇÃO CORRETA AO CARREGAR A PÁGINA
-window.addEventListener('DOMContentLoaded', async () => {
-  await fetchRankingGeral();
-  renderRankingGeral();
-  
-  // Vincula a função de mudança da lista suspensa caso o Claude mude o id
-  const select = document.getElementById('student-select') || document.getElementById('user-select');
-  if(select) {
-    select.addEventListener('change', selecionarUsuario);
-  }
-});
-
 /* =========================================================
    CONTEÚDO POR DIA — teoria + questionário.
    Para adicionar um novo dia, acrescente uma chave (ex: 2)
@@ -531,7 +489,6 @@ const QUIZZES = {
         palavrasChave: ["Servidor", "Cargo público", "Classe", "Categoria funcional", "Grupo", "Quadro", "Isolado", "Carreira", "Provimento efetivo", "Comissão", "Mandato revogável", "Desvio de função"],
         paragrafos: [
           "A LC 122/1994 institui o <b>Estatuto</b> dos servidores públicos civis do Estado do RN. O Título I (Art. 1º a 3º) traz as definições-base: <b>servidor</b> é a pessoa investida em cargo; <b>cargo público</b> é o conjunto de atribuições — não confunda os dois.",
-
           "Os agrupamentos crescem em escala: <b>classe → categoria funcional → grupo → quadro</b>. Classe agrupa cargos; categoria funcional agrupa classes; grupo agrupa cargos isolados e categorias afins; quadro é o conjunto de todos os cargos de um Poder ou órgão.",
           "O §1º do Art. 2º separa os cargos em 4 tipos: <b>isolado</b>, <b>de carreira</b>, <b>de provimento efetivo</b> e <b>em comissão</b>. Isolado e carreira falam da estrutura do cargo; efetivo e comissão falam da forma de provimento (a diferença entre eles é o que a banca mais testa).",
           "O <b>mandato</b> (função por tempo limitado) é sempre revogável, mesmo quando preenchido por eleição, salvo disposição em contrário — regra que costuma ser invertida em questões de Certo/Errado.",
@@ -659,61 +616,61 @@ const QUIZZES = {
 const SIMULADOS = {
   "2026-07-26": {
     label: "Simulado 1 — 26/07",
-    disciplinas: ["Legislação Específica — LC 122/1994", "Língua Portuguesa — Interpretação de Texto", "Execução Penal — Lei 7.210/1984", "Direito Penal e Processo Penal"],
+    disciplinas: ["Legislação Específica — LC 122/1994 e LC 566/2016", "Língua Portuguesa — Interpretação de Texto", "Execução Penal — Lei 7.210/1984", "Direito Penal e Processo Penal"],
     questions: [
-      {sec:"leg", q:"Assinale a alternativa que apresenta corretamente a ordem crescente dos agrupamentos previstos no Art. 2º da LC 122/1994, do menor para o maior:", opts:["quadro, grupo, categoria funcional, classe","classe, categoria funcional, grupo, quadro","categoria funcional, classe, quadro, grupo","grupo, quadro, classe, categoria funcional"], correct:1, exp:"A sequência crescente é classe → categoria funcional → grupo → quadro."},
-      {sec:"leg", q:"Cargo em comissão, segundo a alínea \"d\" do §1º do Art. 2º, é aquele:", opts:["constitutivo de categoria funcional","que comporta aquisição de estabilidade","declarado em lei de livre nomeação e exoneração, respeitadas as limitações constitucionais","organizado em nível isolado de atribuições"], correct:2, exp:"A alínea d define exatamente o cargo em comissão como de livre nomeação e exoneração, com as ressalvas constitucionais."},
-      {sec:"leg", q:"É correto afirmar que, segundo a LC 122/1994:", opts:["toda função pública é também um cargo público","todo cargo público é uma função pública, mas o inverso não é verdadeiro","cargo e função são conceitos idênticos na lei","cargo é retribuído por vencimento; função, por gratificação"], correct:3, exp:"Cargo (Art. 2º, I/II) é retribuído por vencimento; função (§2º) é retribuída por gratificação — essa é a distinção central entre os dois institutos."},
-      {sec:"leg", q:"Considere: I) O mandato é sempre revogável, mesmo quando preenchido por eleição, salvo disposição em contrário. II) A designação é a forma de provimento das funções. Está(ão) correta(s):", opts:["apenas I","apenas II","I e II","nenhuma"], correct:2, exp:"I está no §3º do Art. 2º; II está no §1º do Art. 2º (\"as funções são providas mediante designação\")."},
-      {sec:"leg", q:"Um cargo isolado, nos termos da alínea \"a\" do §1º do Art. 2º, corresponde a:", opts:["cargo constitutivo de categoria funcional","profissão ou atividade organizada em um mesmo nível de atribuições e responsabilidades, sem vínculo a categoria","cargo de livre nomeação e exoneração","cargo que exige estabilidade"], correct:1, exp:"Texto literal da alínea a: cargo isolado corresponde a profissões/atividades organizadas em um mesmo nível de atribuições, sem constituir categoria."},
-      {sec:"leg", q:"O Art. 3º, II, da LC 122/1994 prevê que o desvio de função do servidor gera nulidade do ato. Essa responsabilidade recai sobre:", opts:["o servidor desviado, exclusivamente","a autoridade que autorizou o desvio, administrativa e civilmente","o Poder Legislativo","ninguém, pois é vedação sem sanção"], correct:1, exp:"O texto responsabiliza expressamente a autoridade que autorizou o desvio, não o servidor desviado."},
-      {sec:"leg", q:"Sobre a prestação de serviço gratuito (Art. 3º, I), é correto afirmar que:", opts:["é sempre proibida, sem excepcionalidade","é permitida em qualquer hipótese","é vedada, salvo quando declarada relevante e nos casos previstos em lei","depende apenas de autorização verbal da chefia"], correct:2, exp:"O próprio inciso I traz a ressalva de relevância declarada e casos previstos em lei — não é vedação absoluta."},
-      {sec:"leg", q:"A categoria funcional (Art. 2º, IV) se diferencia da classe (Art. 2º, III) porque:", opts:["classe agrupa cargos; categoria funcional agrupa classes","categoria funcional agrupa cargos; classe agrupa categorias","são sinônimos na Lei","classe é exclusiva de cargos em comissão"], correct:0, exp:"Classe é o agrupamento de cargos; categoria funcional é o agrupamento de classes — um nível acima na escala."},
-      {sec:"leg", q:"O quadro específico, mencionado no Art. 2º, VI, corresponde ao conjunto de cargos:", opts:["de toda a Administração Pública estadual","de um órgão de direção superior","de uma única classe","isolados, apenas"], correct:1, exp:"Quadro geral é o conjunto de todos os cargos do Poder/órgão equivalente; quadro específico é o de um órgão de direção superior."},
-      {sec:"leg", q:"A LC 122/1994 fundamenta-se, para instituir o regime jurídico único, no artigo 28 da Constituição:", opts:["Federal","Estadual do Rio Grande do Norte","Municipal de Natal","não cita nenhuma constituição"], correct:1, exp:"O Art. 1º refere-se ao artigo 28 da Constituição Estadual do RN, base para a instituição do regime jurídico único."},
-      {sec:"leg", q:"Marque a alternativa INCORRETA sobre os tipos de cargo do §1º do Art. 2º:", opts:["cargo de carreira é constitutivo de categoria funcional","cargo de provimento efetivo comporta aquisição de estabilidade","cargo isolado corresponde a profissões organizadas em mesmo nível de atribuições","cargo em comissão comporta aquisição de estabilidade"], correct:3, exp:"Cargo em comissão é de livre nomeação e exoneração e NÃO gera estabilidade — só o de provimento efetivo comporta essa aquisição."},
-      {sec:"leg", q:"As funções com investidura por tempo limitado constituem, segundo o §3º do Art. 2º:", opts:["cargo isolado","mandato","categoria funcional","quadro específico"], correct:1, exp:"Texto literal do §3º: funções com investidura por tempo limitado constituem mandato."},
-      {sec:"leg", q:"Sobre o alcance da LC 122/1994 (Art. 1º), é correto dizer que ela abrange:", opts:["apenas os servidores do Poder Executivo estadual","os servidores públicos civis do Estado do RN e das autarquias e fundações públicas estaduais","servidores civis e militares de todo o Brasil","apenas empregados públicos regidos pela CLT"], correct:1, exp:"O Art. 1º delimita o alcance: servidores civis do Estado do RN e de suas autarquias e fundações públicas estaduais."},
+      {sec:"leg", q:"Segundo a LC 122/1994, o estágio probatório do servidor público civil do Estado do RN tem duração de:", opts:["12 meses","18 meses","24 meses","36 meses"], correct:2, exp:"Art. 20 da LC 122/1994: o estágio probatório dura 24 meses — não confundir com o prazo de 3 anos previsto na LC 566/2016 para o Policial Penal."},
+      {sec:"leg", q:"Segundo a LC 566/2016, o estágio probatório do Policial Penal do RN tem duração de:", opts:["12 meses","24 meses","3 anos","5 anos"], correct:2, exp:"Art. 25 da LC 566/2016: o estágio probatório específico da carreira de Policial Penal dura 3 anos — prazo mais longo que os 24 meses da regra geral da LC 122/1994."},
+      {sec:"leg", q:"Sobre a idade-limite para a reversão do servidor aposentado por invalidez, é correto afirmar que:", opts:["a LC 122/1994 e a LC 566/2016 fixam exatamente o mesmo limite de idade","segundo a LC 122/1994, não pode reverter o aposentado que tiver completado 70 anos; segundo a LC 566/2016, o limite é de 65 anos","segundo a LC 122/1994, o limite é de 65 anos; segundo a LC 566/2016, é de 70 anos","nenhuma das duas leis prevê limite de idade para a reversão"], correct:1, exp:"Art. 27 da LC 122/1994 fixa 70 anos; Art. 49 da LC 566/2016 fixa 65 anos — dois limites diferentes para o mesmo instituto."},
+      {sec:"leg", q:"Segundo a LC 566/2016, o ingresso na carreira de Policial Penal exige idade:", opts:["mínima de 18 anos, sem limite máximo","mínima de 18 e máxima de 45 anos","mínima de 21 e máxima de 50 anos","mínima de 18 e máxima de 40 anos"], correct:1, exp:"Art. 16, II, da LC 566/2016 exige idade mínima de 18 e máxima de 45 anos — diferente da LC 122/1994, cujo Art. 7º exige apenas idade mínima de 18 anos, sem fixar limite máximo."},
+      {sec:"leg", q:"Sobre a jornada/regime de trabalho, é correto afirmar que:", opts:["a LC 122/1994 fixa, como regra geral, 40 horas semanais (Art. 19); a LC 566/2016 organiza o regime de plantão do Policial Penal com carga horária de até 160 horas mensais e jornada extraordinária de até 3 horas diárias (Art. 55)","ambas as leis fixam exatamente a mesma carga horária semanal, sem particularidades","a LC 566/2016 não trata de jornada de trabalho, remetendo integralmente à LC 122/1994","a LC 122/1994 fixa 44 horas semanais como regra geral"], correct:0, exp:"Art. 19 da LC 122/1994 (40h semanais, regra geral) e Art. 55, §1º, da LC 566/2016 (até 160h mensais em regime de plantão, extraordinária até 3h diárias) tratam o tema de forma distinta, adequada à natureza do serviço prisional."},
+      {sec:"leg", q:"Quanto às espécies de penalidade disciplinar, é correto afirmar que:", opts:["a LC 122/1994 prevê seis espécies de penalidade, enquanto a LC 566/2016 prevê quatro","as duas leis preveem exatamente as mesmas seis espécies de penalidade","a LC 566/2016 prevê mais espécies de penalidade que a LC 122/1994","nenhuma das duas leis prevê a penalidade de demissão"], correct:0, exp:"Art. 138 da LC 122/1994 lista 6 espécies (incluindo destituição de cargo em comissão e destituição de função de direção/chefia/assessoramento); Art. 58 da LC 566/2016 lista apenas 4 espécies (advertência, suspensão, demissão, cassação de aposentadoria e/ou disponibilidade)."},
+      {sec:"leg", q:"Sobre o prazo de validade do concurso público, é correto afirmar que:", opts:["a LC 122/1994 fixa prazo de até 2 anos, prorrogável uma única vez por igual período; a LC 566/2016 fixa prazo diverso, de 4 anos","tanto a LC 122/1994 (Art. 11) quanto a LC 566/2016 (Art. 17) fixam prazo de até 2 anos, prorrogável uma única vez por igual período","apenas a LC 566/2016 prevê prazo de validade para o concurso público","a LC 122/1994 não prevê prorrogação do prazo de validade do concurso"], correct:1, exp:"Neste ponto específico as duas leis coincidem — questão pensada para testar se o candidato não presume diferença onde, na verdade, não há."},
+      {sec:"leg", q:"Segundo a LC 566/2016, o processo administrativo disciplinar aplicável ao Policial Penal:", opts:["é inteiramente próprio, sem qualquer relação com a LC 122/1994","é aquele previsto na LC 122/1994 e na LC Estadual nº 303/2005, sem prejuízo das disposições da LC 566/2016","é definido exclusivamente por regulamento interno da Secretaria","não existe, pois a LC 566/2016 não prevê regime disciplinar"], correct:1, exp:"Art. 67 da LC 566/2016 remete expressamente ao rito da LC 122/1994 e da LC 303/2005."},
+      {sec:"leg", q:"Segundo a LC 566/2016, no que não conflitar com suas disposições específicas, aplica-se supletivamente ao Policial Penal:", opts:["o Código Penal","a LC 122/1994","a Constituição Federal, exclusivamente","a Consolidação das Leis do Trabalho"], correct:1, exp:"Art. 79 da LC 566/2016: aplicação supletiva da LC 122/1994 no que não conflitar com a lei específica — evidencia a relação de complementaridade entre as duas leis."},
+      {sec:"leg", q:"Segundo a LC 566/2016, o trabalho do Policial Penal é exercido:", opts:["em regime de dedicação exclusiva, de natureza especial, sujeito a condições como tensão emocional decorrente de eventos conflitivos","em regime de meio período, sem qualquer especificidade","em regime idêntico ao de qualquer servidor civil do Estado, sem particularidades","sem qualquer previsão legal sobre a natureza do trabalho"], correct:0, exp:"Art. 24 da LC 566/2016 caracteriza o trabalho do Policial Penal como de regime de dedicação exclusiva e natureza especial."},
+      {sec:"leg", q:"Assinale a alternativa correta sobre as indenizações previstas na LC 566/2016 para o Policial Penal:", opts:["ajuda de custo, diárias, auxílio-funeral e auxílio para aquisição de fardamento","apenas ajuda de custo e diárias, nos mesmos termos exatos da LC 122/1994","a LC 566/2016 não prevê indenizações, remetendo integralmente à LC 122/1994","apenas gratificação natalina e adicional por tempo de serviço"], correct:0, exp:"O rol de indenizações do Art. 39 da LC 566/2016 inclui auxílio-funeral e auxílio-fardamento — itens específicos da carreira — além de ajuda de custo e diárias."},
+      {sec:"leg", q:"Segundo a LC 566/2016, a remoção do Policial Penal eleito para mandato classista é vedada:", opts:["em qualquer hipótese, sem exceção, enquanto durar o mandato","até 1 ano após a extinção do mandato, exceto se a pedido, por permuta ou em caso de falta grave","apenas durante o primeiro ano do mandato, sem exceções","a LC 566/2016 não trata do tema, remetendo à CF"], correct:1, exp:"Art. 43, §7º, da LC 566/2016 prevê essa vedação com as exceções indicadas."},
+      {sec:"leg", q:"Sobre o adicional por tempo de serviço, é correto afirmar que:", opts:["a LC 566/2016 prevê percentual e limite máximo diferentes dos previstos na LC 122/1994","tanto a LC 566/2016 (Art. 42) quanto a LC 122/1994 (Art. 75) preveem 5% por quinquênio de serviço, limitado a 35%","apenas a LC 122/1994 prevê adicional por tempo de serviço","o adicional por tempo de serviço foi extinto pela LC 566/2016"], correct:1, exp:"Outro ponto de coincidência entre as duas leis: 5% por quinquênio, até o limite de 35% (7 quinquênios)."},
 
-      {sec:"port", q:"Quando uma alternativa apresenta uma informação que, embora coerente com o tema, o texto simplesmente não menciona, ela deve ser classificada como:", opts:["incompatível com o texto","não abordada pelo texto","inferência válida","ideia central"], correct:1, exp:"\"Não abordada\" é diferente de \"incompatível\": aqui o texto simplesmente não trata do assunto, sem contradizê-lo."},
-      {sec:"port", q:"O uso do conectivo \"além disso\" em um texto sinaliza, tipicamente, uma relação de:", opts:["oposição","condição","adição","causa"], correct:2, exp:"\"Além disso\" soma uma informação a outra já apresentada — relação de adição."},
-      {sec:"port", q:"Ao se deparar com uma alternativa que usa a expressão \"exceto quando\", o candidato deve:", opts:["ignorá-la, pois não altera o sentido da frase","lê-la com atenção redobrada, pois pode indicar uma negação disfarçada","marcá-la como certa automaticamente","considerá-la sempre errada"], correct:1, exp:"Expressões como \"exceto quando\" escondem uma negação parcial — exigem leitura atenta antes de julgar a alternativa."},
-      {sec:"port", q:"A principal diferença entre uma alternativa \"incompatível\" e uma \"não abordada\" pelo texto é que:", opts:["a incompatível contradiz o texto; a não abordada simplesmente não é tratada por ele","não há diferença entre as duas","a não abordada sempre está certa","a incompatível é sempre uma inferência válida"], correct:0, exp:"Incompatível vai contra o que o texto afirma; não abordada é um tema que o texto nem chega a tratar."},
-      {sec:"port", q:"Um exemplo citado pelo autor para ilustrar seu argumento deve ser entendido como:", opts:["a ideia central do texto","um apoio à ideia central, e não a própria tese","uma informação irrelevante que pode ser ignorada","sempre uma inferência"], correct:1, exp:"Exemplos sustentam a tese, mas não a substituem — confundir exemplo com ideia central é um erro comum."},
-      {sec:"port", q:"Encontrar no texto o trecho que sustenta (ou refuta) a alternativa é uma estratégia que ajuda a evitar, principalmente, o erro de:", opts:["coesão referencial","extrapolação","pontuação","concordância verbal"], correct:1, exp:"Voltar ao texto antes de julgar a alternativa é a defesa mais eficaz contra a extrapolação."},
-      {sec:"port", q:"O conectivo \"se\", em uma frase, costuma introduzir uma relação de:", opts:["condição","conclusão","oposição","adição"], correct:0, exp:"\"Se\" é o conectivo condicional por excelência."},
-      {sec:"port", q:"Uma alternativa que transforma uma opinião pessoal do autor em um fato universalmente aceito comete o erro de:", opts:["coesão referencial","generalização indevida","pontuação","regência verbal"], correct:1, exp:"Transformar uma opinião específica em regra geral é o clássico erro de generalização indevida."},
-      {sec:"port", q:"Ao identificar o referente de uma expressão como \"essa medida\" em um texto, o leitor está exercendo a habilidade de:", opts:["inferência","coesão referencial","extrapolação","generalização"], correct:1, exp:"Identificar a quem/o que uma expressão retoma é exatamente o mecanismo de coesão referencial."},
-      {sec:"port", q:"Se o texto atribui uma afirmação a um especialista citado, e a alternativa atribui essa mesma afirmação ao autor do texto, o erro cometido é:", opts:["troca de responsável pela informação","negação disfarçada","coesão referencial","generalização indevida"], correct:0, exp:"Trocar quem disse o quê dentro do texto é o erro de troca de responsável pela informação."},
-      {sec:"port", q:"A leitura atenta de uma questão de interpretação de texto deve priorizar:", opts:["o conhecimento prévio do candidato sobre o assunto, mesmo que contrarie o texto","exatamente o que o texto afirma, permite inferir ou não aborda","a opinião pessoal do candidato sobre o tema","apenas a primeira frase do texto"], correct:1, exp:"A prova avalia a leitura do texto apresentado, não o conhecimento geral do candidato sobre o tema."},
-      {sec:"port", q:"Marque a alternativa que descreve corretamente uma inferência:", opts:["repetição literal de uma frase do texto","conclusão que o texto permite, sem estar escrita literalmente e sem contradizê-lo","informação inventada pelo candidato","opinião pessoal do leitor"], correct:1, exp:"Inferência é a conclusão logicamente permitida pelo texto, sem repeti-lo literalmente e sem extrapolá-lo."},
+      {sec:"port", q:"Considere as afirmações: I) Toda inferência é uma extrapolação. II) Toda extrapolação é um erro de interpretação. Está(ão) correta(s):", opts:["apenas I","apenas II","I e II","nenhuma"], correct:1, exp:"Inferência válida NÃO é extrapolação (é conclusão permitida pelo texto); porém toda extrapolação é, de fato, um erro de interpretação, pois ultrapassa o que o texto autoriza concluir."},
+      {sec:"port", q:"Um texto afirma que \"especialistas apontam que a medida trouxe resultados mistos\". Uma alternativa que afirme que \"o autor do texto considera que a medida trouxe resultados mistos\" comete o erro de:", opts:["generalização indevida","troca de responsável pela informação","coesão referencial","negação disfarçada"], correct:1, exp:"O texto atribui a afirmação a especialistas citados, não ao autor — atribuir a fala a quem não a proferiu é troca de responsável pela informação."},
+      {sec:"port", q:"A expressão \"não obstante\", em um texto, introduz tipicamente uma relação de:", opts:["adição","oposição/concessão","causa","condição"], correct:1, exp:"\"Não obstante\" equivale a \"apesar disso\", indicando oposição/concessão, e não simples adição."},
+      {sec:"port", q:"Assinale a alternativa que apresenta um par de conectivos com a MESMA função lógico-discursiva:", opts:["\"porém\" e \"logo\"","\"portanto\" e \"por conseguinte\"","\"caso\" e \"embora\"","\"além disso\" e \"todavia\""], correct:1, exp:"\"Portanto\" e \"por conseguinte\" introduzem conclusão; as demais alternativas combinam funções distintas entre si (oposição/conclusão, condição/concessão, adição/oposição)."},
+      {sec:"port", q:"Se um texto afirma que \"alguns estudos indicam\" determinado resultado, uma alternativa que afirme que \"os estudos comprovam de forma definitiva\" esse resultado comete, principalmente, o erro de:", opts:["coesão referencial","generalização indevida, ao transformar possibilidade em certeza","negação disfarçada","troca de responsável"], correct:1, exp:"\"Alguns estudos indicam\" é possibilidade parcial; \"comprovam de forma definitiva\" é certeza absoluta — generalização indevida do grau de certeza."},
+      {sec:"port", q:"Assinale a alternativa que contém uma negação disfarçada:", opts:["\"a medida nunca funcionou\"","\"a medida não deixou de gerar efeitos, ainda que limitados\"","\"a medida funcionou integralmente\"","\"a medida foi aprovada por unanimidade\""], correct:1, exp:"A dupla negação (\"não deixou de\") disfarça uma afirmação, exigindo atenção redobrada — é o tipo de construção sintática típica da negação disfarçada."},
+      {sec:"port", q:"Sobre a diferença entre \"incompatível com o texto\" e \"extrapolação\", é correto afirmar que:", opts:["são a mesma coisa, apenas com nomes diferentes","a incompatibilidade contradiz o texto; a extrapolação acrescenta informação plausível não afirmada pelo texto, sem necessariamente contradizê-lo","toda extrapolação é, ao mesmo tempo, uma incompatibilidade","a incompatibilidade é sempre uma inferência válida"], correct:1, exp:"Incompatibilidade = contradição direta; extrapolação = acréscimo não autorizado, mesmo que plausível e não contraditório."},
+      {sec:"port", q:"Em um texto argumentativo, a função de um contraexemplo apresentado pelo autor é, tipicamente:", opts:["reforçar diretamente a tese principal, sem função crítica","antecipar e refutar uma possível objeção à tese defendida","substituir a tese principal por uma nova ideia","encerrar o texto sem qualquer relação com o argumento anterior"], correct:1, exp:"O contraexemplo costuma servir para antecipar e neutralizar objeções, fortalecendo a tese por meio da refutação do contra-argumento."},
+      {sec:"port", q:"Considere um texto que apresenta a tese central no primeiro parágrafo e, no último, uma ressalva que limita seu alcance. Uma alternativa que ignore essa ressalva e apresente a tese como absoluta comete o erro de:", opts:["coesão referencial","generalização indevida","troca de responsável","inferência válida"], correct:1, exp:"Ignorar a ressalva final e tratar a tese como absoluta é generalizar indevidamente algo que o próprio texto já havia limitado."},
+      {sec:"port", q:"A palavra \"contudo\", em um texto, pode ser substituída, sem alteração de sentido lógico, por:", opts:["\"portanto\"","\"além disso\"","\"entretanto\"","\"porque\""], correct:2, exp:"\"Contudo\" e \"entretanto\" são conectivos de oposição/contraste equivalentes; os demais têm funções lógicas diferentes (conclusão, adição, causa)."},
+      {sec:"port", q:"Considerando um texto que afirma que \"todos os membros do comitê aprovaram a proposta após a reunião de terça-feira\", assinale a alternativa que representa uma inferência válida (e não uma extrapolação):", opts:["\"a proposta foi aprovada por unanimidade entre os presentes na reunião de terça-feira\"","\"a proposta era polêmica antes da reunião\"","\"o comitê se reúne toda terça-feira\"","\"a proposta foi aprovada porque era a única opção viável\""], correct:0, exp:"\"Todos aprovaram\" permite inferir aprovação unânime; as demais alternativas trazem informações não contidas no enunciado — extrapolação."},
+      {sec:"port", q:"Sobre estratégias para questões de interpretação de maior grau de dificuldade, é correto afirmar que:", opts:["alternativas muito próximas ao texto, com pequenas alterações de conectivo ou de responsável pela fala, costumam ser as mais usadas pela banca para induzir o erro","apenas alternativas totalmente distintas do texto costumam ser usadas como opção errada","o grau de dificuldade não depende da proximidade textual da alternativa com o texto-base","alternativas idênticas ao texto são sempre a resposta considerada errada"], correct:0, exp:"Quanto mais sutil a alteração (um conectivo, o sujeito de uma fala), mais difícil fica identificar o erro — por isso essas são as alternativas preferidas em questões mais difíceis."},
 
-      {sec:"exec", q:"A Lei de Execução Penal (Lei 7.210/1984) tem por finalidade:", opts:["apenas punir o condenado","efetivar as disposições da sentença ou decisão criminal e proporcionar condições para a harmônica integração social do condenado e do internado","regular exclusivamente o processo de conhecimento penal","tratar apenas de matéria orçamentária do sistema prisional"], correct:1, exp:"A LEP tem dupla finalidade: efetivar a sentença e viabilizar a reintegração social do condenado/internado."},
-      {sec:"exec", q:"Entre as modalidades de assistência ao preso previstas na LEP, NÃO se inclui:", opts:["assistência material","assistência à saúde","assistência jurídica","assistência financeira direta e incondicional"], correct:3, exp:"A LEP prevê assistência material, à saúde, jurídica, educacional, social e religiosa — não existe modalidade de \"assistência financeira direta e incondicional\"."},
-      {sec:"exec", q:"A remição da pena pelo trabalho, na LEP, ocorre, em regra, na proporção de:", opts:["1 dia de pena a cada 2 dias de trabalho","1 dia de pena a cada 3 dias de trabalho","2 dias de pena a cada 1 dia de trabalho","não há remição pelo trabalho, apenas pelo estudo"], correct:1, exp:"A proporção geral da remição pelo trabalho é de 1 dia de pena para cada 3 dias trabalhados."},
-      {sec:"exec", q:"A remição pela leitura/estudo é um direito do preso que:", opts:["só se aplica ao regime aberto","permite abater tempo de pena mediante atividades educacionais ou de leitura, conforme regulamentação","é vedada a quem cumpre pena em regime fechado","substitui integralmente o cumprimento da pena"], correct:1, exp:"A remição educacional permite abater dias de pena por meio de estudo, conforme critérios regulamentares, sem excluir nenhum regime."},
-      {sec:"exec", q:"O Regime Disciplinar Diferenciado (RDD) é aplicado, entre outras hipóteses, a preso que:", opts:["pratica falta disciplinar leve","apresenta alto risco para a ordem e a segurança do estabelecimento penal ou da sociedade","está prestes a progredir de regime","é primário e de bom comportamento"], correct:1, exp:"O RDD é reservado a situações de alto risco à ordem e à segurança, não a faltas leves ou presos de bom comportamento."},
-      {sec:"exec", q:"São órgãos da execução penal, entre outros:", opts:["apenas o juízo da execução","o Conselho Nacional de Política Criminal e Penitenciária (CNPCP), o Juízo da Execução, o Ministério Público e o Conselho Penitenciário","apenas a polícia penal","apenas o Ministério Público"], correct:1, exp:"A LEP prevê uma estrutura de órgãos da execução, incluindo CNPCP, Juízo da Execução, Ministério Público e Conselho Penitenciário, entre outros."},
-      {sec:"exec", q:"A progressão de regime prisional, em regra, exige o cumprimento de:", opts:["requisito exclusivamente objetivo (tempo de pena), sem qualquer outro critério","requisito objetivo (fração de pena cumprida) e requisito subjetivo (comportamento/mérito), conforme a lei","apenas requisito subjetivo","nenhum requisito, sendo automática"], correct:1, exp:"A progressão combina requisito objetivo (fração cumprida) e subjetivo (comportamento), conforme a legislação de execução penal."},
-      {sec:"exec", q:"O livramento condicional é:", opts:["forma de extinção da pena","benefício que permite o cumprimento do restante da pena em liberdade, mediante condições, após preenchidos requisitos legais","sinônimo de indulto","aplicável apenas a condenados por crimes de menor potencial ofensivo"], correct:1, exp:"O livramento condicional antecipa a liberdade do condenado, sob condições, sem extinguir a pena, desde que preenchidos os requisitos legais."},
-      {sec:"exec", q:"A saída temporária, diferentemente da permissão de saída, é concedida:", opts:["apenas em caso de falecimento de familiar","sem escolta, a presos em regime semiaberto, para visita à família, frequência a curso ou atividades que concorram para o retorno ao convívio social, nas hipóteses e prazos legais","apenas a presos em regime fechado","apenas com escolta policial permanente"], correct:1, exp:"A saída temporária dispensa escolta e destina-se a fins como visita à família e estudo; a permissão de saída costuma exigir escolta, para casos como tratamento médico."},
-      {sec:"exec", q:"Detração, no âmbito da execução penal, consiste em:", opts:["aumento da pena por reincidência","cômputo, na pena privativa de liberdade, do tempo de prisão provisória, prisão administrativa ou internação já cumprido pelo condenado","extinção da punibilidade","substituição da pena por multa"], correct:1, exp:"Detração é o abatimento, na pena a cumprir, do tempo que o condenado já passou preso provisoriamente ou internado."},
-      {sec:"exec", q:"Os estabelecimentos penais destinam-se, entre outras finalidades, a abrigar presos:", opts:["apenas em regime fechado","segundo o regime de cumprimento de pena (fechado, semiaberto, aberto) e outras classificações previstas em lei","exclusivamente por sexo, sem outro critério","sem qualquer critério de separação"], correct:1, exp:"A LEP organiza os estabelecimentos penais conforme o regime de pena e outros critérios de classificação previstos em lei."},
-      {sec:"exec", q:"A regressão de regime prisional pode ocorrer quando o condenado:", opts:["cumpre integralmente os requisitos de bom comportamento","pratica fato definido como crime doloso ou falta grave, entre outras hipóteses previstas em lei","atinge o tempo mínimo de pena cumprida","é beneficiado por indulto"], correct:1, exp:"A prática de crime doloso ou falta grave, entre outras hipóteses legais, é causa de regressão de regime."},
-      {sec:"exec", q:"A assistência religiosa ao preso, prevista na LEP, caracteriza-se por ser:", opts:["obrigatória, com participação compulsória em cultos","facultada, respeitando a liberdade de crença do preso","restrita a uma única religião oficial","vedada dentro dos estabelecimentos penais"], correct:1, exp:"A assistência religiosa é facultativa ao preso, em respeito à liberdade de crença, e não pode ser imposta."},
+      {sec:"exec", q:"Segundo a LEP, a remição da pena pelo estudo se dá na proporção de:", opts:["1 dia de pena a cada 12 horas de frequência escolar, divididas em, no mínimo, 3 dias de efetiva atividade educacional","1 dia de pena a cada 24 horas de frequência escolar, em qualquer número de dias","2 dias de pena a cada 12 horas de frequência escolar","a LEP não prevê remição pelo estudo, apenas pelo trabalho"], correct:0, exp:"Art. 126, §1º, I, da LEP: remição pelo estudo na proporção de 1 dia de pena a cada 12h de frequência escolar, fracionadas em, no mínimo, 3 dias."},
+      {sec:"exec", q:"Segundo a LEP (Art. 112, com a redação da Lei 13.964/2019), a progressão de regime do condenado primário, por crime cometido sem violência ou grave ameaça à pessoa, exige o cumprimento de, no mínimo:", opts:["10% da pena","16% da pena","25% da pena","40% da pena"], correct:1, exp:"Art. 112, I, da LEP: 16% da pena para o condenado primário em crime sem violência ou grave ameaça."},
+      {sec:"exec", q:"Segundo a LEP, a duração máxima do Regime Disciplinar Diferenciado (RDD), sem prejuízo de repetição da sanção por nova falta grave da mesma espécie, é de:", opts:["6 meses","1 ano","2 anos","tempo indeterminado, a critério da autoridade administrativa"], correct:2, exp:"Art. 52 da LEP fixa o prazo máximo de até 2 anos para o RDD."},
+      {sec:"exec", q:"Durante o cumprimento do RDD, é assegurado ao preso, segundo a LEP:", opts:["visitas diárias, sem limite de pessoas","saída da cela por 2 horas diárias para banho de sol","proibição total de qualquer visita, inclusive de advogado","acesso irrestrito a aparelhos de telefonia"], correct:1, exp:"Art. 52, §4º, da LEP assegura ao preso em RDD a saída da cela por 2 horas diárias para banho de sol."},
+      {sec:"exec", q:"Constitui falta disciplinar de natureza grave, segundo a LEP, entre outras hipóteses:", opts:["atraso injustificado de poucos minutos ao trabalho interno","posse de aparelho telefônico, de rádio ou similar que permita comunicação com outros presos ou com o ambiente externo","recusar-se a participar de atividade recreativa facultativa","manifestar opinião crítica sobre a administração do estabelecimento, de forma respeitosa"], correct:1, exp:"Art. 50, VII, da LEP tipifica como falta grave a posse de aparelho de comunicação não autorizado."},
+      {sec:"exec", q:"Segundo a LEP, o livramento condicional pode ser concedido ao condenado não reincidente em crime doloso, com bons antecedentes, após o cumprimento de:", opts:["mais de 1/6 da pena","mais de 1/3 da pena","mais de 1/2 da pena","mais de 2/3 da pena"], correct:1, exp:"Requisito objetivo do livramento condicional (Art. 83, I, do CP, aplicado na execução): mais de 1/3 da pena para o condenado não reincidente em crime doloso e com bons antecedentes."},
+      {sec:"exec", q:"Segundo a LEP, para o condenado reincidente em crime doloso, o livramento condicional exige o cumprimento de:", opts:["mais de 1/3 da pena","mais de 1/2 da pena","mais de 2/3 da pena","a integralidade da pena"], correct:1, exp:"Art. 83, II, do CP: mais de 1/2 da pena para o condenado reincidente em crime doloso."},
+      {sec:"exec", q:"O Conselho Penitenciário, órgão da execução penal previsto na LEP, tem natureza:", opts:["jurisdicional, com poder de decidir sobre progressão de regime","consultiva e fiscalizadora da execução da pena","exclusivamente administrativa, sem qualquer função fiscalizadora","policial, com poder de prisão"], correct:1, exp:"O Conselho Penitenciário é órgão consultivo e fiscalizador da execução penal, sem poder decisório jurisdicional."},
+      {sec:"exec", q:"O Patronato, órgão da execução penal previsto na LEP, tem entre suas atribuições:", opts:["julgar processos de execução penal","prestar assistência aos albergados e egressos, além de fiscalizar o cumprimento de penas restritivas de direitos e colaborar na fiscalização do livramento condicional","substituir o Conselho Penitenciário em todas as suas funções","determinar a concessão de indulto"], correct:1, exp:"O Patronato presta assistência a albergados/egressos e fiscaliza penas restritivas de direitos e o livramento condicional, sem função jurisdicional."},
+      {sec:"exec", q:"Sobre os estabelecimentos penais, a LEP determina que devem ser dotados de unidades autônomas para:", opts:["apenas presos do regime fechado","presos provisórios e condenados, mantendo separados os regimes","apenas presos do sexo masculino","apenas presos primários"], correct:1, exp:"A LEP exige separação entre presos provisórios e condenados, e entre os diferentes regimes de cumprimento de pena."},
+      {sec:"exec", q:"Assinale a alternativa correta sobre a remição pelo trabalho e pelo estudo, segundo a LEP:", opts:["as duas modalidades de remição são mutuamente exclusivas — o preso deve optar por uma delas","é possível a cumulação da remição pelo trabalho e pelo estudo, respeitados os critérios legais para cada modalidade","apenas presos em regime aberto podem remir pena por estudo","a remição pelo estudo não é reconhecida pela LEP, apenas por normas infralegais"], correct:1, exp:"A sistemática da LEP admite a cumulação da remição por trabalho e por estudo, quando as atividades são exercidas em períodos distintos e devidamente comprovadas."},
+      {sec:"exec", q:"Segundo a LEP, entre os direitos do preso previstos no Art. 41, inclui-se:", opts:["o direito à visita do cônjuge, da companheira, de parentes e amigos em dias determinados","o direito de ausentar-se do estabelecimento sem autorização","o direito de recusar qualquer trabalho, mesmo remunerado","o direito de não se submeter a qualquer forma de disciplina interna"], correct:0, exp:"Art. 41, X, da LEP: direito à visita do cônjuge, da companheira, de parentes e amigos, em dias determinados."},
+      {sec:"exec", q:"Sobre a classificação das faltas disciplinares na LEP, é correto afirmar que:", opts:["existem apenas duas categorias: leve e grave","existem três categorias — leve, média e grave —, sendo a própria LEP responsável por especificar as faltas graves, remetendo à legislação local a especificação das leves e médias","não há qualquer classificação, sendo a gravidade decidida caso a caso sem critério legal","todas as faltas são consideradas graves para fins de regressão de regime"], correct:1, exp:"Art. 49 da LEP prevê as três categorias; os Art. 50 e 52 especificam as faltas graves, remetendo à legislação local a definição das leves e médias."},
 
-      {sec:"penal", q:"O princípio da legalidade em Direito Penal significa que:", opts:["não há crime sem lei anterior que o defina, nem pena sem prévia cominação legal","o juiz pode criar tipos penais por analogia","a pena pode ser aplicada retroativamente para prejudicar o réu","qualquer conduta socialmente reprovável é crime"], correct:0, exp:"É o clássico \"nullum crimen, nulla poena sine lege\" — base do princípio da legalidade penal."},
-      {sec:"penal", q:"A tipicidade, elemento do conceito analítico de crime, refere-se a:", opts:["à consciência da ilicitude do agente","à correspondência entre a conduta praticada e a descrição legal do crime","à capacidade de responder pelos próprios atos","à ausência de causas excludentes de ilicitude"], correct:1, exp:"Tipicidade é o encaixe da conduta concreta na descrição abstrata prevista no tipo penal."},
-      {sec:"penal", q:"São excludentes de ilicitude previstas no Código Penal, entre outras:", opts:["embriaguez voluntária e coação irresistível","legítima defesa e estado de necessidade","menoridade e doença mental","arrependimento posterior e desistência voluntária"], correct:1, exp:"Legítima defesa e estado de necessidade são causas clássicas de exclusão da ilicitude; as demais alternativas tratam de outros institutos penais."},
-      {sec:"penal", q:"O concurso de pessoas ocorre quando:", opts:["o mesmo agente pratica dois ou mais crimes","duas ou mais pessoas concorrem para a mesma infração penal","há apenas um autor e nenhum partícipe","o crime é praticado sem dolo ou culpa"], correct:1, exp:"Concurso de pessoas pressupõe pluralidade de agentes contribuindo para a mesma infração."},
-      {sec:"penal", q:"Sobre as penas no Direito Penal brasileiro, é correto afirmar que:", opts:["só existem penas privativas de liberdade","podem ser privativas de liberdade, restritivas de direitos ou de multa","a pena de multa substitui sempre a privativa de liberdade","não há dosimetria, sendo a pena sempre fixa"], correct:1, exp:"O Código Penal prevê três espécies de pena: privativa de liberdade, restritiva de direitos e multa."},
-      {sec:"penal", q:"Constitui crime contra a Administração Pública, entre outros:", opts:["furto","peculato","lesão corporal","estelionato contra particular"], correct:1, exp:"Peculato é crime funcional contra a Administração Pública; as demais alternativas são crimes de outras naturezas."},
-      {sec:"penal", q:"A prisão preventiva, como medida cautelar no processo penal, é decretada:", opts:["automaticamente em qualquer investigação","quando presentes os requisitos legais, como garantia da ordem pública, da instrução criminal ou aplicação da lei penal","apenas após o trânsito em julgado da sentença","somente a pedido do próprio investigado"], correct:1, exp:"A prisão preventiva exige fundamentação em requisitos legais específicos, não sendo automática nem posterior ao trânsito em julgado."},
-      {sec:"penal", q:"O inquérito policial tem natureza:", opts:["jurisdicional, com decisão de mérito","administrativa, de caráter investigatório e preparatório da ação penal","exclusivamente judicial","de processo autônomo, com sentença própria"], correct:1, exp:"O inquérito é procedimento administrativo, investigatório, que prepara a futura ação penal — não profere decisão de mérito."},
-      {sec:"penal", q:"A ação penal pública incondicionada é aquela que:", opts:["depende de representação da vítima","depende de requisição do Ministro da Justiça","pode ser proposta pelo Ministério Público independentemente de qualquer condição especial","só pode ser proposta pelo próprio ofendido"], correct:2, exp:"Na ação pública incondicionada, o MP pode agir sem depender de representação ou requisição de terceiros."},
-      {sec:"penal", q:"O concurso de crimes, no Direito Penal, pode ser classificado, entre outras formas, como:", opts:["concurso material e concurso formal","legítima defesa recíproca","crime impossível","erro de tipo"], correct:0, exp:"Concurso material e concurso formal são as duas modalidades clássicas de concurso de crimes; as demais alternativas tratam de institutos diversos."},
-      {sec:"penal", q:"A dosimetria da pena, no sistema trifásico do Código Penal, considera:", opts:["apenas a pena mínima abstrata","circunstâncias judiciais, agravantes/atenuantes e causas de aumento/diminuição, em três fases","apenas o tempo de prisão provisória","apenas a reincidência"], correct:1, exp:"O sistema trifásico fixa a pena-base, aplica agravantes/atenuantes e depois causas de aumento/diminuição, em três etapas sucessivas."},
-      {sec:"penal", q:"Os recursos no processo penal têm a função de:", opts:["impedir qualquer revisão de decisões judiciais","permitir que a parte inconformada busque a reforma, anulação ou esclarecimento de uma decisão judicial","substituir o inquérito policial","suspender definitivamente a ação penal"], correct:1, exp:"Recursos são o instrumento processual para a parte inconformada buscar reforma, anulação ou esclarecimento de uma decisão."}
+      {sec:"penal", q:"O erro sobre elemento constitutivo do tipo penal, que exclui o dolo mas permite a punição por crime culposo se previsto em lei, é denominado:", opts:["erro de proibição","erro de tipo","erro de execução (aberratio ictus)","erro sobre a pessoa"], correct:1, exp:"Art. 20 do CP: erro de tipo exclui o dolo, permanecendo a punição por culpa se prevista em lei."},
+      {sec:"penal", q:"O erro sobre a ilicitude do fato, quando inevitável (escusável), tem como consequência, segundo o Código Penal:", opts:["isenção de pena","redução da pena de um sexto a um terço, sempre","aumento da pena","nenhuma alteração na pena"], correct:0, exp:"Art. 21 do CP: erro de proibição inevitável isenta de pena; se evitável, apenas reduz a pena de 1/6 a 1/3."},
+      {sec:"penal", q:"Quando o agente, mediante uma só ação ou omissão, pratica dois ou mais crimes, idênticos ou não, configura-se:", opts:["concurso material","concurso formal","crime continuado","concurso de agentes"], correct:1, exp:"Art. 70 do CP: concurso formal é a prática de dois ou mais crimes mediante uma só conduta."},
+      {sec:"penal", q:"O crime continuado, segundo o Código Penal, caracteriza-se por uma série de crimes da mesma espécie, praticados em condições de:", opts:["tempo, lugar, maneira de execução e outras semelhantes, considerados os subsequentes continuação do primeiro","tempo e lugar absolutamente idênticos, sem qualquer variação admitida","autoria diversa em cada um dos crimes","ausência total de vínculo entre as condutas"], correct:0, exp:"Art. 71 do CP: crime continuado exige semelhança de tempo, lugar, maneira de execução e outras circunstâncias."},
+      {sec:"penal", q:"A prisão em flagrante \"impróprio\", segundo o CPP, ocorre quando:", opts:["o agente é perseguido, logo após a prática do crime, em situação que faça presumir ser autor da infração","o agente é encontrado, logo depois, com instrumentos que façam presumir a autoria","o agente é surpreendido cometendo a infração","o CPP não prevê essa modalidade de flagrante"], correct:0, exp:"O CPP prevê três modalidades: próprio (surpreendido cometendo), impróprio (perseguição logo após) e presumido/ficto (encontrado, logo depois, com objetos que façam presumir a autoria)."},
+      {sec:"penal", q:"A prisão temporária, disciplinada em lei especial (Lei 7.960/1989), tem prazo inicial de:", opts:["5 dias, prorrogável por igual período em caso de extrema e comprovada necessidade","10 dias, sem possibilidade de prorrogação","30 dias, prorrogável por mais 30, em regra","prazo indeterminado, a critério do juiz"], correct:0, exp:"Prazo geral de 5 dias, prorrogável por igual período; em crimes hediondos e equiparados, o prazo passa a ser de 30 dias, prorrogável por igual período."},
+      {sec:"penal", q:"Na ação penal exclusivamente privada, o direito de queixa está sujeito a prazo decadencial de:", opts:["6 meses, contados do conhecimento da autoria do fato","1 ano, contados da data do fato","30 dias, contados da data do fato","não há prazo decadencial na ação penal privada"], correct:0, exp:"Art. 38 do CPP: prazo decadencial de 6 meses, contado do conhecimento da autoria."},
+      {sec:"penal", q:"Constitui nulidade absoluta, cuja alegação não se sujeita à preclusão, entre outras hipóteses:", opts:["a incompetência territorial não arguida em tempo oportuno","a violação a princípio constitucional do processo, como o da ampla defesa","pequenas irregularidades formais sem qualquer prejuízo às partes","qualquer nulidade sempre se convalida com o trânsito em julgado"], correct:1, exp:"Nulidades absolutas envolvem violação a normas de interesse público/constitucional, como a ampla defesa, e não se sujeitam à preclusão."},
+      {sec:"penal", q:"O prazo para interposição do recurso de apelação, em regra, no processo penal, é de:", opts:["5 dias","10 dias","15 dias","30 dias"], correct:0, exp:"Art. 593 do CPP: prazo de 5 dias para a interposição da apelação."},
+      {sec:"penal", q:"O habeas corpus é o remédio constitucional destinado a proteger, especificamente:", opts:["o direito de propriedade","a liberdade de locomoção, sempre que alguém sofrer ou se achar ameaçado de sofrer violência ou coação ilegal","o direito à informação de dados pessoais","o direito de reunião"], correct:1, exp:"Art. 5º, LXVIII, da CF e Art. 647 do CPP: habeas corpus protege a liberdade de locomoção."},
+      {sec:"penal", q:"O princípio da presunção de inocência (ou não culpabilidade) determina que:", opts:["o réu deve provar sua inocência para não ser condenado","ninguém será considerado culpado até o trânsito em julgado de sentença penal condenatória","a prisão em flagrante já basta para a condenação","o ônus da prova é sempre do réu, nunca da acusação"], correct:1, exp:"Art. 5º, LVII, da CF: ninguém será considerado culpado até o trânsito em julgado de sentença condenatória."},
+      {sec:"penal", q:"O sistema processual penal acusatório, refletido no processo penal brasileiro, caracteriza-se, entre outros aspectos, por:", opts:["concentrar as funções de acusar, defender e julgar em uma única pessoa","separar as funções de acusação (a cargo do Ministério Público ou do ofendido) e de julgamento (a cargo do juiz), preservando a imparcialidade do julgador","dispensar completamente o contraditório","atribuir ao juiz a iniciativa da ação penal"], correct:1, exp:"O sistema acusatório separa as funções de acusar e julgar, preservando a imparcialidade — diferente do sistema inquisitorial, em que as funções se concentram no juiz."}
     ]
   }
   /* Próximo domingo: adicionar aqui, ex.:
@@ -882,11 +839,6 @@ function loadDay(day){
   updateGates();
   renderQuiz();
   updateProgress();
-}
-
-function restartQuiz(){
-  loadDay(activeDay);
-  window.scrollTo({top:0, behavior:'smooth'});
 }
 
 function renderQuiz(){
