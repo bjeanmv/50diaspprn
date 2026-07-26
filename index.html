@@ -683,6 +683,24 @@ function secLabel(sec){
   return map[sec] || sec;
 }
 
+/* Embaralha as alternativas de uma questão (e remapeia o índice da correta),
+   para que a posição do gabarito não fique fixa/tendenciosa a cada carregamento. */
+function shuffleQuestion(item){
+  const order = [0, 1, 2, 3];
+  for(let i = order.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return {
+    ...item,
+    opts: order.map(i => item.opts[i]),
+    correct: order.indexOf(item.correct)
+  };
+}
+function shuffleQuestions(list){
+  return list.map(shuffleQuestion);
+}
+
 /* =========================================================
    ALUNO — seleção de sessão (armazenamento pessoal, não compartilhado)
    ========================================================= */
@@ -830,7 +848,7 @@ function loadDay(day){
   activeDay = day;
   renderTheory(day);
   const data = QUIZZES[day];
-  activeQuestions = data.questions;
+  activeQuestions = shuffleQuestions(data.questions);
   score = 0;
   answered = new Array(activeQuestions.length).fill(false);
   document.getElementById('quizDayLabel').textContent = data.label;
@@ -1106,7 +1124,7 @@ function iniciarSimulado(){
   const data = SIMULADOS[simChosenDate];
   if(!data) return;
   simSelectedDate = simChosenDate;
-  simQuestions = data.questions;
+  simQuestions = shuffleQuestions(data.questions);
   simScore = 0;
   simAnswered = new Array(simQuestions.length).fill(false);
   simSeconds = 150*60;
