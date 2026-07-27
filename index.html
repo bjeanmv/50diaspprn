@@ -160,7 +160,7 @@
 
     <div class="card">
       <h2>Painel de multas do grupo</h2>
-      <p class="hint">Cada dia furado marcado no check-in soma +1 na coluna de dias furados e gera multa. Multa fixa: R$ 1,00 por dia furado.</p>
+      <p class="hint">Cada dia furado marcado no check-in soma +1 na coluna <code>dias_furados</code> do Supabase. Multa fixa: R$ 1,00 por dia furado.</p>
       <table>
         <thead>
           <tr><th>Integrante</th><th>Dias furados</th><th>Multa total</th></tr>
@@ -200,7 +200,7 @@
   <div id="view-ranking-geral" style="display:none;">
     <div class="card">
       <p class="hint">
-        Todos os dados abaixo vêm diretamente da tabela Ranking Concurso e atualizam automaticamente
+        Todos os dados abaixo vêm diretamente da tabela <code>ranking_concurso</code> no Supabase e atualizam automaticamente
         sempre que alguém pontua em um questionário diário, em um simulado, ou tem um dia furado registrado.
       </p>
       <div class="btn-row">
@@ -210,7 +210,7 @@
 
     <div class="card">
       <h2>🏆 Ranking Geral (placar principal)</h2>
-      <p class="hint">Soma de questões diárias + pontuações dos simulados, do maior para o menor. Inclui o total de multas acumuladas.</p>
+      <p class="hint">Soma de pontos_diarios + pontos_simulados, do maior para o menor. Inclui o total de multas acumuladas.</p>
       <table>
         <thead><tr><th>#</th><th>Integrante</th><th>Pontos diários</th><th>Pontos simulados</th><th>Total de pontos</th><th>Multas</th></tr></thead>
         <tbody id="rankingPrincipalTable"></tbody>
@@ -219,7 +219,7 @@
 
     <div class="card">
       <h2>📘 Ranking Diário</h2>
-      <p class="hint">Ordenado por pontos diários, do maior para o menor.</p>
+      <p class="hint">Ordenado por <code>pontos_diarios</code>, do maior para o menor.</p>
       <table>
         <thead><tr><th>#</th><th>Integrante</th><th>Pontos diários</th></tr></thead>
         <tbody id="rankingDiarioTable"></tbody>
@@ -228,7 +228,7 @@
 
     <div class="card">
       <h2>🕐 Ranking de Simulados</h2>
-      <p class="hint">Ordenado por pontos simulados, do maior para o menor.</p>
+      <p class="hint">Ordenado por <code>pontos_simulados</code>, do maior para o menor.</p>
       <table>
         <thead><tr><th>#</th><th>Integrante</th><th>Pontos simulados</th></tr></thead>
         <tbody id="rankingSimuladosPontosTable"></tbody>
@@ -602,6 +602,69 @@ const QUIZZES = {
       {sec:"penal", q:"Marque a alternativa correta sobre a aplicação da lei penal no espaço:", opts:["o Brasil nunca reconhece regras de direito internacional em matéria penal","a aplicação da lei brasileira no território nacional se dá sem prejuízo de convenções, tratados e regras de direito internacional","tratados internacionais nunca influenciam a aplicação da lei penal brasileira","a lei penal brasileira é aplicada apenas a brasileiros, mesmo fora do território nacional, sem exceção"], correct:1, exp:"Ressalva expressa do Art. 5º do CP quanto a convenções, tratados e regras de direito internacional."},
       {sec:"penal", q:"Os princípios da legalidade e da anterioridade, em conjunto, fundamentam a garantia de que:", opts:["o cidadão pode ser punido por qualquer conduta que o Estado considere reprovável, mesmo sem lei","ninguém será punido por fato que, ao tempo em que foi praticado, não era definido em lei como crime","a pena pode ser aplicada antes da lei que a prevê","o princípio da legalidade só vale para crimes graves"], correct:1, exp:"Síntese dos dois princípios: segurança jurídica de que só é crime o que a lei, já vigente à época do fato, define como tal."}
     ]
+  },
+  3: {
+    label: "Dia 3 — 27/07",
+    sub: "Legislação Específica (LC 122/1994 — Ingresso, Provimento e Posse, Art. 4º a 21) + Direito Constitucional (Princípios Fundamentais da CF/88, Art. 1º a 4º)",
+    disciplinas: ["Legislação Específica — LC 122/1994 (peso 2)", "Direito Constitucional"],
+    teoria: [
+      {
+        titulo: "Legislação Específica — LC 122/1994: Ingresso, Provimento e Posse (Art. 4º a 21)",
+        palavrasChave: ["Provimento", "Nomeação", "Concurso público", "Posse", "Exercício", "Estágio probatório", "Estabilidade"],
+        paragrafos: [
+          "<b>Provimento</b> (Art. 4º) é o ato de preenchimento de cargo ou função pública vago, atribuindo-lhe um titular. As formas de provimento (Art. 5º) incluem nomeação, promoção, transferência, readaptação, reversão, aproveitamento, reintegração e recondução.",
+          "A <b>nomeação</b> em caráter efetivo depende de prévia habilitação em <b>concurso público</b> (Art. 9º), com prazo de validade de até 2 anos, prorrogável uma vez por igual período, e reserva mínima de 10% das vagas para pessoas com deficiência (Art. 12).",
+          "A <b>posse</b> (Art. 13) é o ato gerador da investidura — exige declaração de bens do servidor e deve ocorrer em até 30 dias da publicação do provimento, prorrogável por igual período a requerimento. Se não ocorrer no prazo, o provimento é declarado sem efeito.",
+          "O <b>exercício</b> (Art. 16) é o efetivo desempenho das atribuições — prazo de 30 dias, contado da posse, para o servidor entrar em exercício.",
+          "O <b>estágio probatório</b> (Art. 20) dura 24 meses, avaliado por 8 fatores (assiduidade, pontualidade, disciplina, capacidade de iniciativa, produtividade, responsabilidade, probidade, interesse pelo serviço). A <b>estabilidade</b> (Art. 21) só é adquirida após 2 anos de efetivo exercício, com confirmação no estágio probatório."
+        ],
+        mnemonico: "A trilha do servidor: PROVIMENTO (preenche o cargo) → POSSE (30 dias, declara bens) → EXERCÍCIO (mais 30 dias) → ESTÁGIO PROBATÓRIO (24 meses, 8 fatores) → ESTABILIDADE (2 anos). Decore a ordem cronológica, pois a banca gosta de trocar os prazos entre as fases."
+      },
+      {
+        titulo: "Direito Constitucional — Princípios Fundamentais da CF/88 (Art. 1º a 4º)",
+        palavrasChave: ["Fundamentos", "Objetivos fundamentais", "Princípios das relações internacionais", "Poderes da União", "Soberania", "Dignidade da pessoa humana"],
+        paragrafos: [
+          "O Art. 1º traz os <b>fundamentos</b> da República: soberania, cidadania, dignidade da pessoa humana, valores sociais do trabalho e da livre iniciativa, e pluralismo político. Seu parágrafo único fixa que todo poder emana do povo, exercido direta ou indiretamente.",
+          "O Art. 2º trata dos <b>Poderes da União</b> — Legislativo, Executivo e Judiciário —, independentes e harmônicos entre si.",
+          "O Art. 3º lista os <b>objetivos fundamentais</b> da República: construir sociedade livre, justa e solidária; garantir o desenvolvimento nacional; erradicar a pobreza e reduzir desigualdades sociais e regionais; promover o bem de todos sem qualquer forma de discriminação.",
+          "O Art. 4º fixa os <b>princípios das relações internacionais</b>: independência nacional, prevalência dos direitos humanos, autodeterminação dos povos, não-intervenção, igualdade entre os Estados, defesa da paz, solução pacífica dos conflitos, repúdio ao terrorismo e ao racismo, cooperação entre os povos, concessão de asilo político — e busca de integração latino-americana."
+        ],
+        mnemonico: "Não confunda os três artigos-chave: <b>Art. 1º = O QUE O BRASIL É</b> (fundamentos); <b>Art. 3º = ONDE O BRASIL QUER CHEGAR</b> (objetivos); <b>Art. 4º = COMO O BRASIL SE COMPORTA COM OS OUTROS PAÍSES</b> (relações internacionais). A troca entre esses três é a pegadinha mais comum da banca."
+      }
+    ],
+    questions: [
+      {sec:"leg", q:"Segundo a LC 122/1994, o ato de preenchimento de cargo ou função pública vago, atribuindo-lhe um titular, denomina-se:", opts:["posse","provimento","exercício","investidura"], correct:1, exp:"Art. 4º da LC 122/1994: provimento é o ato de preenchimento de cargo ou função vago."},
+      {sec:"leg", q:"Considere: I) A nomeação em caráter efetivo aplica-se a cargo isolado, de provimento efetivo ou de carreira. II) A nomeação em comissão destina-se a cargos de confiança, de livre exoneração. Está(ão) correta(s), segundo a LC 122/1994:", opts:["apenas I","apenas II","I e II","nenhuma"], correct:2, exp:"Ambas as afirmativas reproduzem corretamente os incisos I e II do Art. 8º da LC 122/1994."},
+      {sec:"leg", q:"Assinale a alternativa INCORRETA sobre os requisitos para investidura em cargo ou função, segundo o Art. 7º da LC 122/1994:", opts:["nacionalidade brasileira","quitação com as obrigações militares e eleitorais","idade mínima de 21 anos","aptidão física e mental comprovada em inspeção médica oficial"], correct:2, exp:"O Art. 7º exige idade mínima de 18 anos, não 21 — as demais alternativas reproduzem corretamente incisos do artigo."},
+      {sec:"leg", q:"Um candidato aprovado em concurso público é nomeado para cargo de provimento efetivo, mas não comparece para a posse dentro do prazo legal, sem justificativa. Segundo a LC 122/1994, o ato de provimento, nessa hipótese, é:", opts:["mantido, com nova contagem de prazo","declarado sem efeito","convertido automaticamente em exoneração","convalidado após 60 dias"], correct:1, exp:"Art. 13, §7º, da LC 122/1994: decorrido o prazo legal sem a posse, o ato de provimento é declarado sem efeito."},
+      {sec:"leg", q:"Segundo a LC 122/1994, o prazo para a posse é de 30 dias, contados da publicação do ato de provimento, sendo esse prazo:", opts:["improrrogável em qualquer hipótese","prorrogável por igual período, a requerimento do interessado","prorrogável apenas uma vez, por 15 dias","inexistente, pois a posse deve ocorrer imediatamente"], correct:1, exp:"Art. 13, §3º, da LC 122/1994: prazo de 30 dias, prorrogável por igual período a requerimento do interessado."},
+      {sec:"leg", q:"Sobre a diferença entre posse e exercício, segundo a LC 122/1994, é correto afirmar que:", opts:["posse e exercício são sinônimos, sem distinção prática","posse é o ato gerador da investidura em cargo ou função; exercício é o efetivo desempenho das atribuições do cargo ou função","exercício ocorre sempre antes da posse","posse é exigida apenas para cargos em comissão"], correct:1, exp:"Art. 13 (posse) e Art. 16 (exercício) da LC 122/1994 tratam de institutos sequenciais e distintos."},
+      {sec:"leg", q:"Segundo a LC 122/1994, é de quantos dias o prazo para o servidor entrar em exercício, contado da data da posse?", opts:["10 dias","15 dias","20 dias","30 dias"], correct:3, exp:"Art. 16, §1º, da LC 122/1994: prazo de 30 dias para entrar em exercício, contado da posse."},
+      {sec:"leg", q:"Assinale a alternativa correta sobre a reserva de vagas para pessoas com deficiência em concurso público, segundo a LC 122/1994:", opts:["reserva mínima de 5% das vagas","reserva mínima de 10% das vagas, classificadas em lista própria","não há reserva de vagas prevista na lei","a reserva é de 20%, sem lista própria"], correct:1, exp:"Art. 12 da LC 122/1994: reserva mínima de 10% das vagas, com classificação em lista própria."},
+      {sec:"leg", q:"Sobre os fatores de avaliação do estágio probatório, é correto afirmar que a LC 122/1994 prevê, entre outros:", opts:["apenas assiduidade e pontualidade","assiduidade, pontualidade, disciplina, capacidade de iniciativa, produtividade, responsabilidade, probidade e interesse pelo serviço","apenas produtividade e responsabilidade","exclusivamente a nota obtida no concurso público"], correct:1, exp:"Art. 20 da LC 122/1994 lista 8 fatores de avaliação durante o estágio probatório."},
+      {sec:"leg", q:"Segundo a LC 122/1994, a estabilidade no serviço público é adquirida:", opts:["imediatamente após a posse","após 12 meses de efetivo exercício, independentemente do estágio probatório","após 2 anos de efetivo exercício, estando o servidor confirmado no estágio probatório","apenas após 5 anos de exercício"], correct:2, exp:"Art. 21 da LC 122/1994: estabilidade após 2 anos de efetivo exercício e confirmação no estágio probatório."},
+      {sec:"leg", q:"Um servidor não aprovado no estágio probatório, mas que gozava de estabilidade em cargo anterior, deve ser, segundo a LC 122/1994:", opts:["demitido, sem qualquer direito","exonerado do novo cargo e reconduzido ao cargo anterior","mantido no novo cargo, independentemente do resultado da avaliação","aposentado compulsoriamente"], correct:1, exp:"Art. 20, §3º, da LC 122/1994: o servidor não aprovado é exonerado do novo cargo e, se estável, reconduzido ao anterior."},
+      {sec:"leg", q:"Sobre a nomeação para cargo de carreira, segundo a LC 122/1994, é correto afirmar que:", opts:["independe de concurso público, bastando ato discricionário da autoridade","depende de prévia habilitação em concurso público de provas ou de provas e títulos, observada a ordem de classificação","pode ser realizada por qualquer servidor efetivo, sem concurso","somente pode ocorrer por promoção interna"], correct:1, exp:"Art. 9º da LC 122/1994 exige prévia habilitação em concurso público, com respeito à ordem de classificação."},
+      {sec:"leg", q:"Segundo a LC 122/1994, o provimento por eleição:", opts:["é a regra geral para o preenchimento de cargos públicos","restringe-se aos casos previstos em lei","é vedado em qualquer hipótese","equivale sempre a provimento em comissão"], correct:1, exp:"Art. 5º, §2º, da LC 122/1994: o provimento por eleição restringe-se aos casos previstos em lei."},
+      {sec:"leg", q:"Sobre a produção de efeitos do ato de provimento, segundo a LC 122/1994, é correto afirmar que:", opts:["produz efeitos desde a data de sua assinatura, independentemente de publicação","produz efeitos a partir de sua publicação no jornal oficial","produz efeitos apenas após a posse do nomeado","não exige qualquer formalidade de publicidade"], correct:1, exp:"Art. 6º da LC 122/1994: o provimento só produz efeitos a partir da publicação no jornal oficial."},
+      {sec:"leg", q:"Considere: I) Os requisitos do Art. 7º são comprovados no ato da posse, salvo os que, pelo edital do concurso, devam ser comprovados na inscrição. II) A declaração de bens é exigida apenas de servidores que ocupem cargo de chefia. Está(ão) correta(s), segundo a LC 122/1994:", opts:["apenas I","apenas II","I e II","nenhuma"], correct:0, exp:"A afirmativa I reproduz o Art. 7º, §2º; a II está errada, pois a declaração de bens (Art. 13, §5º) é exigida de todo servidor no ato da posse, não apenas de chefias."},
+
+      {sec:"const", q:"Segundo o Art. 1º da CF/88, são fundamentos da República Federativa do Brasil, entre outros:", opts:["soberania, cidadania e dignidade da pessoa humana","apenas a soberania e a separação dos poderes","apenas os valores sociais do trabalho","a forma de governo parlamentarista"], correct:0, exp:"O Art. 1º lista cinco fundamentos: soberania, cidadania, dignidade da pessoa humana, valores sociais do trabalho e da livre iniciativa, e pluralismo político."},
+      {sec:"const", q:"Assinale a alternativa que NÃO corresponde a um fundamento da República Federativa do Brasil, segundo o Art. 1º da CF/88:", opts:["cidadania","pluralismo político","desenvolvimento nacional","valores sociais do trabalho e da livre iniciativa"], correct:2, exp:"\"Desenvolvimento nacional\" é objetivo fundamental do Art. 3º, não fundamento do Art. 1º — pegadinha clássica de troca entre os dois artigos."},
+      {sec:"const", q:"Segundo o parágrafo único do Art. 1º da CF/88, todo poder emana do povo, que o exerce:", opts:["exclusivamente por meio de representantes eleitos","por meio de representantes eleitos ou diretamente, nos termos da Constituição","exclusivamente de forma direta, por plebiscito","apenas por meio do Poder Judiciário"], correct:1, exp:"O parágrafo único do Art. 1º admite tanto a democracia representativa quanto a participação direta, nos termos da CF."},
+      {sec:"const", q:"Considere: I) São Poderes da União o Legislativo, o Executivo e o Judiciário. II) Os Poderes da União são independentes e harmônicos entre si. Está(ão) correta(s), segundo o Art. 2º da CF/88:", opts:["apenas I","apenas II","I e II","nenhuma"], correct:2, exp:"O Art. 2º reúne exatamente essas duas ideias: quais são os Poderes e como se relacionam entre si."},
+      {sec:"const", q:"Constitui objetivo fundamental da República Federativa do Brasil, segundo o Art. 3º da CF/88:", opts:["garantir a soberania nacional","erradicar a pobreza e a marginalização e reduzir as desigualdades sociais e regionais","promover a separação entre os Poderes","assegurar a forma federativa de Estado"], correct:1, exp:"Erradicar pobreza/marginalização e reduzir desigualdades é um dos quatro objetivos fundamentais do Art. 3º."},
+      {sec:"const", q:"Assinale a alternativa que NÃO é um objetivo fundamental previsto no Art. 3º da CF/88:", opts:["construir uma sociedade livre, justa e solidária","garantir o desenvolvimento nacional","promover o bem de todos, sem preconceitos de origem, raça, sexo, cor, idade e quaisquer outras formas de discriminação","garantir a soberania e a independência nacional"], correct:3, exp:"\"Soberania e independência nacional\" está entre os princípios das relações internacionais do Art. 4º, não entre os objetivos do Art. 3º."},
+      {sec:"const", q:"Entre os princípios que regem a República Federativa do Brasil em suas relações internacionais, previstos no Art. 4º da CF/88, inclui-se:", opts:["a prevalência dos direitos humanos","a intervenção em assuntos internos de outros Estados","a supremacia militar sobre os países vizinhos","a adoção de regime econômico único para todos os países da América Latina"], correct:0, exp:"A prevalência dos direitos humanos é um dos princípios expressos no Art. 4º da CF/88."},
+      {sec:"const", q:"Segundo o Art. 4º da CF/88, o Brasil repudia, em suas relações internacionais:", opts:["apenas o terrorismo","o terrorismo e o racismo","apenas conflitos armados regionais","exclusivamente a intervenção militar estrangeira"], correct:1, exp:"O Art. 4º, VIII, prevê expressamente o repúdio ao terrorismo e ao racismo."},
+      {sec:"const", q:"O parágrafo único do Art. 4º da CF/88 prevê que a República Federativa do Brasil buscará:", opts:["a anexação territorial de países vizinhos","a integração econômica, política, social e cultural dos povos da América Latina, visando à formação de uma comunidade latino-americana de nações","a criação de uma moeda única mundial","a extinção das fronteiras nacionais"], correct:1, exp:"Texto literal do parágrafo único do Art. 4º da CF/88."},
+      {sec:"const", q:"Um tratado internacional que viole a prevalência dos direitos humanos contraria diretamente princípio previsto:", opts:["no Art. 1º da CF/88 (fundamentos da República)","no Art. 3º da CF/88 (objetivos fundamentais)","no Art. 4º da CF/88 (princípios das relações internacionais)","a CF/88 não trata do tema"], correct:2, exp:"A prevalência dos direitos humanos é princípio das relações internacionais, previsto no Art. 4º, II."},
+      {sec:"const", q:"Sobre a forma de Estado adotada pelo Brasil, segundo o Art. 1º, caput, da CF/88, é correto afirmar que:", opts:["o Brasil constitui-se em Estado unitário centralizado","a República Federativa do Brasil é formada pela união indissolúvel dos Estados, Municípios e Distrito Federal","os Estados-membros podem se separar mediante plebiscito local","os Municípios não integram a federação brasileira"], correct:1, exp:"O Art. 1º, caput, define a forma federativa e a indissolubilidade da união entre os entes."},
+      {sec:"const", q:"Constitui fundamento (e não objetivo) da República Federativa do Brasil, segundo a CF/88:", opts:["erradicar a pobreza","promover o bem de todos sem discriminação","a dignidade da pessoa humana","reduzir desigualdades regionais"], correct:2, exp:"Dignidade da pessoa humana é fundamento do Art. 1º; as demais alternativas são objetivos do Art. 3º."},
+      {sec:"const", q:"Segundo o Art. 2º da CF/88, a relação entre os Poderes Legislativo, Executivo e Judiciário caracteriza-se pela:", opts:["subordinação hierárquica do Judiciário ao Executivo","independência e harmonia entre eles","fusão de funções em um único órgão","subordinação do Legislativo ao Judiciário"], correct:1, exp:"O Art. 2º consagra a separação de Poderes com independência e harmonia entre eles."},
+      {sec:"const", q:"Entre os princípios das relações internacionais do Art. 4º da CF/88, encontra-se a concessão de:", opts:["cidadania automática a estrangeiros","asilo político","anistia irrestrita a crimes internacionais","extradição obrigatória em qualquer hipótese"], correct:1, exp:"Art. 4º, X, da CF/88: concessão de asilo político."},
+      {sec:"const", q:"Considere: I) A soberania é fundamento da República Federativa do Brasil (Art. 1º). II) A construção de uma sociedade livre, justa e solidária é objetivo fundamental da República (Art. 3º). Está(ão) correta(s):", opts:["apenas I","apenas II","I e II","nenhuma"], correct:2, exp:"Ambas as afirmativas classificam corretamente os institutos entre fundamento (Art. 1º) e objetivo (Art. 3º)."}
+    ]
   }
   /* Próximo dia: adicionar aqui, ex.:
   3: { label:"Dia 3 — ...", sub:"...", disciplinas:[...], teoria:[ {titulo, palavrasChave:[...], paragrafos:[...], mnemonico} ], questions:[...] }
@@ -679,7 +742,7 @@ const SIMULADOS = {
 };
 
 function secLabel(sec){
-  const map = { leg: "Legislação Específica", port: "Língua Portuguesa", exec: "Execução Penal", penal: "Direito Penal e Processo Penal" };
+  const map = { leg: "Legislação Específica", port: "Língua Portuguesa", exec: "Execução Penal", penal: "Direito Penal e Processo Penal", const: "Direito Constitucional" };
   return map[sec] || sec;
 }
 
@@ -699,6 +762,27 @@ function shuffleQuestion(item){
 }
 function shuffleQuestions(list){
   return list.map(shuffleQuestion);
+}
+/* Embaralha a ORDEM das questões dentro de cada matéria (mantendo os grupos por
+   "sec" juntos, para os cabeçalhos de seção continuarem corretos), evitando que
+   questões parecidas fiquem sempre encostadas uma na outra. */
+function shuffleWithinGroups(list){
+  const groups = {};
+  const secOrder = [];
+  list.forEach(item => {
+    if(!groups[item.sec]){ groups[item.sec] = []; secOrder.push(item.sec); }
+    groups[item.sec].push(item);
+  });
+  let result = [];
+  secOrder.forEach(sec => {
+    const arr = groups[sec];
+    for(let i = arr.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    result = result.concat(arr);
+  });
+  return result;
 }
 
 /* =========================================================
@@ -848,7 +932,7 @@ function loadDay(day){
   activeDay = day;
   renderTheory(day);
   const data = QUIZZES[day];
-  activeQuestions = shuffleQuestions(data.questions);
+  activeQuestions = shuffleQuestions(shuffleWithinGroups(data.questions));
   score = 0;
   answered = new Array(activeQuestions.length).fill(false);
   document.getElementById('quizDayLabel').textContent = data.label;
@@ -1133,7 +1217,7 @@ function iniciarSimulado(){
   const data = SIMULADOS[simChosenDate];
   if(!data) return;
   simSelectedDate = simChosenDate;
-  simQuestions = shuffleQuestions(data.questions);
+  simQuestions = shuffleQuestions(shuffleWithinGroups(data.questions));
   simScore = 0;
   simAnswered = new Array(simQuestions.length).fill(false);
   simSeconds = 150*60;
