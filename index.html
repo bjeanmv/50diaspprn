@@ -160,7 +160,7 @@
 
     <div class="card">
       <h2>Painel de multas do grupo</h2>
-      <p class="hint">Cada dia furado marcado no check-in soma +1 na coluna <code>dias_furados</code> do Supabase. Multa fixa: R$ 1,00 por dia furado.</p>
+      <p class="hint">Cada dia furado marcado no check-in soma +1 na coluna de dias furados e gera multa. Multa fixa: R$ 1,00 por dia furado.</p>
       <table>
         <thead>
           <tr><th>Integrante</th><th>Dias furados</th><th>Multa total</th></tr>
@@ -179,7 +179,7 @@
         <p>Selecione seu nome no topo da página para registrar seu check-in.</p>
       </div>
       <div id="checkinFormArea">
-        <p class="hint">Registrando para: <b id="checkinQuemLabel">—</b>. Selecione a data do cronograma e marque se estudou. Marcar "Não estudei" soma +1 em <code>dias_furados</code> no Supabase (uma única vez por dia).</p>
+        <p class="hint">Registrando para: <b id="checkinQuemLabel">—</b>. Selecione a data do cronograma e marque se estudou. Marcar "Não estudei" soma +1 em dias furados (uma única vez por dia).</p>
         <div class="row" style="max-width:260px;">
           <div class="field">
             <label class="field-label" for="checkinData">Data</label>
@@ -200,7 +200,7 @@
   <div id="view-ranking-geral" style="display:none;">
     <div class="card">
       <p class="hint">
-        Todos os dados abaixo vêm diretamente da tabela <code>ranking_concurso</code> no Supabase e atualizam automaticamente
+        Todos os dados abaixo vêm diretamente da tabela e atualizam automaticamente
         sempre que alguém pontua em um questionário diário, em um simulado, ou tem um dia furado registrado.
       </p>
       <div class="btn-row">
@@ -210,7 +210,7 @@
 
     <div class="card">
       <h2>🏆 Ranking Geral (placar principal)</h2>
-      <p class="hint">Soma de pontos_diarios + pontos_simulados, do maior para o menor. Inclui o total de multas acumuladas.</p>
+      <p class="hint">Soma de pontos diários + pontos simulados, do maior para o menor. Inclui o total de multas acumuladas.</p>
       <table>
         <thead><tr><th>#</th><th>Integrante</th><th>Pontos diários</th><th>Pontos simulados</th><th>Total de pontos</th><th>Multas</th></tr></thead>
         <tbody id="rankingPrincipalTable"></tbody>
@@ -219,7 +219,7 @@
 
     <div class="card">
       <h2>📘 Ranking Diário</h2>
-      <p class="hint">Ordenado por <code>pontos_diarios</code>, do maior para o menor.</p>
+      <p class="hint">Ordenado por pontos diários, do maior para o menor.</p>
       <table>
         <thead><tr><th>#</th><th>Integrante</th><th>Pontos diários</th></tr></thead>
         <tbody id="rankingDiarioTable"></tbody>
@@ -228,7 +228,7 @@
 
     <div class="card">
       <h2>🕐 Ranking de Simulados</h2>
-      <p class="hint">Ordenado por <code>pontos_simulados</code>, do maior para o menor.</p>
+      <p class="hint">Ordenado por pontos simulados, do maior para o menor.</p>
       <table>
         <thead><tr><th>#</th><th>Integrante</th><th>Pontos simulados</th></tr></thead>
         <tbody id="rankingSimuladosPontosTable"></tbody>
