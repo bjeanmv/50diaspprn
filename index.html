@@ -1578,6 +1578,7 @@ function selectAnswer(qIdx, oIdx, row, card){
   if(!isCorrect && currentStudent){
     registrarErro(currentStudent, item.sec, 'Dia ' + activeDay, item.q, item.opts, item.correct, oIdx, item.exp);
   }
+  updateProgress();
 }
 
 function updateProgress(){
