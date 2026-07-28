@@ -430,6 +430,70 @@ async function ajustarDiasFuradosLote(nome, delta){
   if(atual) atual.dias_furados = novoTotal;
 }
 
+/* =========================================================
+   RESULTADOS (Supabase) — substitui os antigos quizResults e
+   state.simulados guardados localmente. Serve tanto pra saber
+   "esse aluno já fez esse dia/simulado?" quanto pro histórico.
+   ========================================================= */
+let resultadosCache = { dia: [], sim: [] };
+
+async function carregarResultados(){
+  if(!supabaseClient) return;
+  const { data, error } = await supabaseClient.from('resultados').select('*');
+  if(error){ console.error(error); mostrarErroSupabase('Não foi possível carregar os resultados do grupo: ' + error.message); return; }
+  const linhas = data || [];
+  resultadosCache = { dia: linhas.filter(r => r.tipo === 'dia'), sim: linhas.filter(r => r.tipo === 'sim') };
+}
+
+function buscarResultadoLocal(tipo, chave, nome){
+  const lista = tipo === 'dia' ? resultadosCache.dia : resultadosCache.sim;
+  return lista.find(r => r.chave === String(chave) && r.nome === nome) || null;
+}
+
+async function salvarResultado(tipo, chave, nome, acertos, total, tempoMin){
+  if(!supabaseClient){ mostrarErroSupabase('Sem conexão com o banco agora — o resultado não foi salvo.'); return false; }
+  const payload = { tipo, chave: String(chave), nome, acertos, total };
+  if(tempoMin != null) payload.tempo_min = tempoMin;
+  const { error } = await supabaseClient.from('resultados').upsert(payload, { onConflict: 'tipo,chave,nome' });
+  if(error){ console.error(error); mostrarErroSupabase('Não foi possível salvar o resultado de "' + nome + '": ' + error.message); return false; }
+  // atualiza o cache local pra refletir na hora, sem precisar recarregar tudo
+  const lista = tipo === 'dia' ? resultadosCache.dia : resultadosCache.sim;
+  const existente = lista.find(r => r.chave === String(chave) && r.nome === nome);
+  if(existente){ Object.assign(existente, payload); } else { lista.push(payload); }
+  return true;
+}
+
+/* =========================================================
+   MULTAS POR PRAZO (Supabase) — dedup atômico via chave única
+   no banco (tipo, chave, nome). Se a inserção falhar por já
+   existir, significa que essa multa já foi aplicada antes.
+   ========================================================= */
+async function registrarMultaPrazoSeNecessario(tipo, chave, nome){
+  if(!supabaseClient){ mostrarErroSupabase('Sem conexão com o banco agora — a multa não foi registrada.'); return false; }
+  const { error } = await supabaseClient.from('multas_prazo').insert({ tipo, chave: String(chave), nome });
+  if(error){
+    if(error.code === '23505') return false; // já existia — não multar de novo
+    console.error(error);
+    mostrarErroSupabase('Não foi possível registrar a marcação de multa de "' + nome + '": ' + error.message);
+    return false;
+  }
+  return true;
+}
+
+/* =========================================================
+   CADERNO DE ERROS (Supabase)
+   ========================================================= */
+async function registrarErro(nome, sec, fonte, q, opts, correctIdx, escolhidaIdx, exp){
+  if(!nome || !supabaseClient) return;
+  const { error } = await supabaseClient.from('caderno_erros').insert({
+    nome, sec, fonte, pergunta: q,
+    resposta_certa: opts[correctIdx],
+    resposta_escolhida: opts[escolhidaIdx],
+    explicacao: exp
+  });
+  if(error){ console.error(error); mostrarErroSupabase('Não foi possível salvar esse erro no caderno: ' + error.message); }
+}
+
 function renderRankingGeral(){
   const tPrincipal = document.getElementById('rankingPrincipalTable');
   const tDiario = document.getElementById('rankingDiarioTable');
@@ -1122,81 +1186,61 @@ function descricaoJanela(dateStr){
 const MULTA_A_PARTIR_DE = "2026-07-27";
 
 /* Aplica multa quando o prazo já venceu — no máximo uma vez por aluno/dia/simulado,
-   controlado localmente em state.janelaMultas. Não vale para datas anteriores a
+   controlado no banco (tabela multas_prazo). Não vale para datas anteriores a
    MULTA_A_PARTIR_DE. */
 async function aplicarMultaJanelaSeNecessario(tipo, dateStr, nome){
   if(!nome || !dateStr) return;
   if(dateStr < MULTA_A_PARTIR_DE) return;
-  const dentro = statusJanela(dateStr).estado === 'aberta';
-  if(dentro) return;
-  const key = tipo + ':' + dateStr;
-  if(!state.janelaMultas) state.janelaMultas = {};
-  if(!state.janelaMultas[key]) state.janelaMultas[key] = {};
-  if(state.janelaMultas[key][nome]) return; // já multado uma vez por essa janela
-
-  const backupAntes = { ...state.janelaMultas[key] };
-  state.janelaMultas[key][nome] = true;
-  try{
-    await window.storage.set('janelaMultas', JSON.stringify(state.janelaMultas), true);
-  } catch(e) {
-    console.error(e);
-    state.janelaMultas[key] = backupAntes; // desfaz a marcação local: não persistiu, então não aplicamos a multa agora
-    mostrarErroSupabase('Não foi possível registrar a marcação de multa neste dispositivo agora (' + (e && e.message ? e.message : 'erro desconhecido') + '). A multa será tentada novamente mais tarde, para não cobrar em duplicidade.');
-    return;
-  }
+  if(statusJanela(dateStr).estado === 'aberta') return;
+  const podeMultar = await registrarMultaPrazoSeNecessario(tipo, dateStr, nome);
+  if(!podeMultar) return; // já tinha sido multado antes (ou falhou ao registrar) — não cobra de novo
   await ajustarDiasFurados(nome, +1);
 }
 
 /* Verifica, para todo dia/simulado cujo prazo já venceu (a partir do Dia 3), quem
-   nunca completou — e aplica a multa retroativa. Todas as marcações pendentes são
-   salvas em UMA ÚNICA gravação (em vez de uma gravação por aluno/dia), evitando
-   disparar muitas requisições em sequência rápida. */
+   nunca completou — e aplica a multa retroativa. O controle de "já multado" é
+   feito no banco (tabela multas_prazo, com chave única), então funciona igual
+   em qualquer navegador/dispositivo, sem depender de nada local. */
 async function verificarMultasPendentes(){
-  if(!MEMBERS || MEMBERS.length === 0) return;
-  if(!state.janelaMultas) state.janelaMultas = {};
+  if(!MEMBERS || MEMBERS.length === 0 || !supabaseClient) return;
+
+  const { data: jaMultadosRaw, error: errMultas } = await supabaseClient.from('multas_prazo').select('tipo,chave,nome');
+  if(errMultas){ console.error(errMultas); mostrarErroSupabase('Não foi possível verificar multas pendentes: ' + errMultas.message); return; }
+  const jaMultados = new Set((jaMultadosRaw || []).map(r => r.tipo + ':' + r.chave + ':' + r.nome));
 
   const pendentes = [];
   for(const day of Object.keys(QUIZZES)){
     const dateStr = QUIZZES[day].date;
     if(!dateStr || dateStr < MULTA_A_PARTIR_DE || statusJanela(dateStr).estado !== 'encerrada') continue;
     for(const nome of MEMBERS){
-      if(state.janelaMultas['dia:'+dateStr] && state.janelaMultas['dia:'+dateStr][nome]) continue;
-      const feito = quizResults[nome] && quizResults[nome][day];
-      if(!feito) pendentes.push({ tipo: 'dia', dateStr, nome });
+      if(jaMultados.has('dia:'+dateStr+':'+nome)) continue;
+      if(!buscarResultadoLocal('dia', day, nome)) pendentes.push({ tipo: 'dia', chave: dateStr, nome });
     }
   }
   for(const dateStr of Object.keys(SIMULADOS)){
     if(dateStr < MULTA_A_PARTIR_DE || statusJanela(dateStr).estado !== 'encerrada') continue;
     for(const nome of MEMBERS){
-      if(state.janelaMultas['sim:'+dateStr] && state.janelaMultas['sim:'+dateStr][nome]) continue;
-      const feito = state.simulados[dateStr] && state.simulados[dateStr][nome];
-      if(!feito) pendentes.push({ tipo: 'sim', dateStr, nome });
+      if(jaMultados.has('sim:'+dateStr+':'+nome)) continue;
+      if(!buscarResultadoLocal('sim', dateStr, nome)) pendentes.push({ tipo: 'sim', chave: dateStr, nome });
     }
   }
 
   if(pendentes.length === 0) return;
 
-  // Marca todas em memória primeiro...
-  const backup = JSON.parse(JSON.stringify(state.janelaMultas));
-  pendentes.forEach(p => {
-    const key = p.tipo + ':' + p.dateStr;
-    if(!state.janelaMultas[key]) state.janelaMultas[key] = {};
-    state.janelaMultas[key][p.nome] = true;
-  });
-
-  // ...e grava tudo de uma vez só.
-  try{
-    await window.storage.set('janelaMultas', JSON.stringify(state.janelaMultas), true);
-  } catch(e) {
-    console.error(e);
-    state.janelaMultas = backup; // não persistiu — desfaz tudo, não aplica nenhuma multa agora
-    mostrarErroSupabase('Não foi possível registrar as marcações de multas pendentes agora (' + (e && e.message ? e.message : 'erro desconhecido') + '). Serão tentadas novamente mais tarde, sem cobrar em duplicidade.');
+  // Registra todas as marcações de uma vez (upsert em lote, ignorando as que já existirem).
+  const { error: errInsert } = await supabaseClient.from('multas_prazo')
+    .upsert(pendentes.map(p => ({ tipo: p.tipo, chave: p.chave, nome: p.nome })), { onConflict: 'tipo,chave,nome', ignoreDuplicates: true });
+  if(errInsert){
+    console.error(errInsert);
+    mostrarErroSupabase('Não foi possível registrar as marcações de multas pendentes agora: ' + errInsert.message);
     return;
   }
 
-  // Persistência local OK — agora aplica cada multa no banco (sem re-buscar o ranking a cada uma).
-  for(const p of pendentes){
-    await ajustarDiasFuradosLote(p.nome, +1);
+  // Persistência OK — soma as multas por pessoa (1 upsert no ranking por pessoa, não por dia).
+  const deltaPorNome = {};
+  pendentes.forEach(p => { deltaPorNome[p.nome] = (deltaPorNome[p.nome] || 0) + 1; });
+  for(const nome of Object.keys(deltaPorNome)){
+    await ajustarDiasFuradosLote(nome, deltaPorNome[nome]);
   }
   await fetchRankingGeral();
   renderRankingGeral();
@@ -1252,8 +1296,7 @@ function shuffleWithinGroups(list){
    ========================================================= */
 async function loadStudent(){
   try{
-    const r = await window.storage.get('meuNome', false);
-    currentStudent = r ? r.value : null;
+    currentStudent = localStorage.getItem('meuNome') || null;
   }catch(e){ currentStudent = null; }
   const sel = document.getElementById('studentSelect');
   sel.innerHTML = '<option value="">— selecione seu nome —</option>' + MEMBERS.map(m => `<option value="${m}">${m}</option>`).join('');
@@ -1265,7 +1308,7 @@ async function onStudentChange(){
   const val = document.getElementById('studentSelect').value;
   currentStudent = val || null;
   try{
-    if(currentStudent) await window.storage.set('meuNome', currentStudent, false);
+    if(currentStudent) localStorage.setItem('meuNome', currentStudent);
   }catch(e){}
   updateGates();
   if(currentStudent){
@@ -1361,7 +1404,7 @@ function popularListaDias(){
   el.innerHTML = dias.map(day => {
     const data = QUIZZES[day];
     const bloqueado = data.date && hoje < data.date;
-    const jaRespondeu = currentStudent && quizResults[currentStudent] && quizResults[currentStudent][day];
+    const jaRespondeu = currentStudent && buscarResultadoLocal('dia', day, currentStudent);
 
     if(bloqueado){
       return `<div style="display:flex;flex-direction:column;gap:3px;">
@@ -1406,7 +1449,7 @@ function popularListaSimulados(){
     const st = statusJanela(d);
     const cor = st.estado === 'aberta' ? 'var(--success)' : 'var(--danger)';
     const desc = descricaoJanela(d);
-    const jaFez = currentStudent && state.simulados[d] && state.simulados[d][currentStudent];
+    const jaFez = currentStudent && buscarResultadoLocal('sim', d, currentStudent);
     return `<div style="display:flex;flex-direction:column;gap:3px;">
       <button onclick="abrirSimulado('${d}')">${label}${jaFez ? ' ✓' : ''}</button>
       <span style="font-size:10.5px;color:${cor};text-align:center;">${desc}${jaFez ? ' · já feito' : ''}</span>
@@ -1458,15 +1501,15 @@ function loadDay(day){
   document.getElementById('resultCard').classList.remove('show');
   updateGates();
 
-  const jaRespondeu = currentStudent && quizResults[currentStudent] && quizResults[currentStudent][day];
+  const jaRespondeu = currentStudent && buscarResultadoLocal('dia', day, currentStudent);
   if(jaRespondeu){
-    activeQuestions = []; answered = []; score = jaRespondeu.score;
+    activeQuestions = []; answered = []; score = jaRespondeu.acertos;
     document.getElementById('progressFill').style.width = '100%';
     document.getElementById('quizArea').innerHTML = '<div class="card"><h2>Você já respondeu este questionário</h2>'
       + '<p class="hint">Cada questionário só pode ser feito uma vez — o resultado abaixo já está contabilizado.</p></div>';
     document.getElementById('resultCard').classList.add('show');
-    document.getElementById('scoreText').textContent = jaRespondeu.score + '/' + jaRespondeu.total;
-    document.getElementById('scoreDetail').textContent = Math.round(jaRespondeu.score/jaRespondeu.total*100) + '% de acerto — sem nova tentativa disponível.';
+    document.getElementById('scoreText').textContent = jaRespondeu.acertos + '/' + jaRespondeu.total;
+    document.getElementById('scoreDetail').textContent = Math.round(jaRespondeu.acertos/jaRespondeu.total*100) + '% de acerto — sem nova tentativa disponível.';
     return;
   }
 
@@ -1569,21 +1612,8 @@ async function finishQuiz(){
 /* =========================================================
    RESULTADOS DE QUESTIONÁRIO (compartilhado, por aluno/dia)
    ========================================================= */
-let quizResults = {};
-
-async function loadQuizResults(){
-  try{ const r = await window.storage.get('quizResults', true); quizResults = r ? JSON.parse(r.value) : {}; }catch(e){ quizResults = {}; }
-}
-async function saveQuizResults(){
-  try{ await window.storage.set('quizResults', JSON.stringify(quizResults), true); }
-  catch(e){ console.error(e); mostrarErroSupabase('Não foi possível salvar seu resultado do questionário neste dispositivo: ' + e.message); }
-}
-
 async function saveQuizResult(nome, day, score, total){
-  await loadQuizResults();
-  if(!quizResults[nome]) quizResults[nome] = {};
-  quizResults[nome][day] = { score, total, date: new Date().toISOString() };
-  await saveQuizResults();
+  await salvarResultado('dia', day, nome, score, total);
 }
 
 /* =========================================================
@@ -1591,30 +1621,6 @@ async function saveQuizResult(nome, day, score, total){
    questionários diários e simulados, sem distinção, agrupados
    por disciplina, com revisão resumida (palavras-chave/mnemônico).
    ========================================================= */
-let cadernoErros = {};
-
-async function loadCadernoErros(){
-  try{ const r = await window.storage.get('cadernoErros', true); cadernoErros = r ? JSON.parse(r.value) : {}; }
-  catch(e){ cadernoErros = {}; }
-}
-async function saveCadernoErros(){
-  try{ await window.storage.set('cadernoErros', JSON.stringify(cadernoErros), true); }
-  catch(e){ console.error(e); mostrarErroSupabase('Não foi possível salvar seu caderno de erros neste dispositivo: ' + e.message); }
-}
-async function registrarErro(nome, sec, fonte, q, opts, correctIdx, escolhidaIdx, exp){
-  if(!nome) return;
-  await loadCadernoErros();
-  if(!cadernoErros[nome]) cadernoErros[nome] = [];
-  cadernoErros[nome].push({
-    sec, fonte, q,
-    respostaCorreta: opts[correctIdx],
-    respostaEscolhida: opts[escolhidaIdx],
-    exp,
-    data: new Date().toISOString()
-  });
-  await saveCadernoErros();
-}
-
 /* Localiza o bloco de teoria (palavras-chave + mnemônico) de uma disciplina
    dentro de um dia, usando a ordem em que os "sec" aparecem nas questões
    daquele dia (1º sec encontrado -> teoria[0], 2º sec -> teoria[1]). */
@@ -1627,11 +1633,22 @@ function getTeoriaBlockForSec(day, sec){
   return idx >= 0 ? data.teoria[idx] : null;
 }
 
-function renderCadernoErros(){
+async function renderCadernoErros(){
   const el = document.getElementById('cadernoErrosArea');
   if(!el) return;
   if(!currentStudent){ el.innerHTML = ''; return; }
-  const erros = cadernoErros[currentStudent] || [];
+  if(!supabaseClient){ el.innerHTML = '<div class="card"><p class="empty">Sem conexão com o banco agora — não é possível carregar o caderno de erros.</p></div>'; return; }
+
+  el.innerHTML = '<div class="card"><p class="hint">Carregando...</p></div>';
+  const { data, error } = await supabaseClient.from('caderno_erros').select('*').eq('nome', currentStudent).order('criado_em', { ascending: true });
+  if(error){
+    console.error(error);
+    mostrarErroSupabase('Não foi possível carregar o caderno de erros: ' + error.message);
+    el.innerHTML = '<div class="card"><p class="empty">Não foi possível carregar o caderno de erros agora.</p></div>';
+    return;
+  }
+
+  const erros = data || [];
   if(erros.length === 0){
     el.innerHTML = '<div class="card"><p class="empty">Nenhum erro registrado até agora — vá respondendo os questionários e simulados que este caderno se monta sozinho.</p></div>';
     return;
@@ -1665,12 +1682,12 @@ function renderCadernoErros(){
       html += `<div class="mnemo"><b>Mnemônico:</b> ${m}</div>`;
     });
     html += '<div style="margin-top:10px;">';
-    lista.forEach((e, i) => {
+    lista.forEach((e) => {
       html += `<div class="qcard">
         <div class="qnum">${e.fonte}</div>
-        <p class="qtext">${e.q}</p>
-        <div class="feedback show no"><b>Você respondeu:</b> ${e.respostaEscolhida}</div>
-        <div class="feedback show ok"><b>Resposta certa:</b> ${e.respostaCorreta}<br>${e.exp}</div>
+        <p class="qtext">${e.pergunta}</p>
+        <div class="feedback show no"><b>Você respondeu:</b> ${e.resposta_escolhida}</div>
+        <div class="feedback show ok"><b>Resposta certa:</b> ${e.resposta_certa}<br>${e.explicacao}</div>
       </div>`;
     });
     html += '</div></div>';
@@ -1683,7 +1700,6 @@ function renderCadernoErros(){
    PAINEL DE SIMULADOS (compartilhado)
    ========================================================= */
 const SUNDAYS = ["2026-07-26","2026-08-02","2026-08-09","2026-08-16","2026-08-23","2026-08-30","2026-09-06"];
-let state = { simulados: {}, janelaMultas: {} };
 
 function fmtDate(iso){
   const [y,m,d] = iso.split("-");
@@ -1691,31 +1707,20 @@ function fmtDate(iso){
 }
 
 async function loadAll(){
-  try{ const r = await window.storage.get('simulados', true); state.simulados = r ? JSON.parse(r.value) : {}; }catch(e){ state.simulados = {}; }
-  try{ const r = await window.storage.get('janelaMultas', true); state.janelaMultas = r ? JSON.parse(r.value) : {}; }catch(e){ state.janelaMultas = {}; }
-  await loadQuizResults();
+  await carregarResultados();
   renderAll();
 }
 
-async function saveSimulados(){
-  try{ await window.storage.set('simulados', JSON.stringify(state.simulados), true); }
-  catch(e){ console.error(e); mostrarErroSupabase('Não foi possível salvar seu resultado do simulado neste dispositivo: ' + e.message); }
-}
-
 async function saveSimuladoResult(nome, data, acertos, tempoMin){
-  if(!state.simulados[data]) state.simulados[data] = {};
-  state.simulados[data][nome] = { acertos, tempo: tempoMin };
-  await saveSimulados();
+  await salvarResultado('sim', data, nome, acertos, 50, tempoMin);
 }
 
 function renderSimuladoTable(){
   const meta = parseInt(document.getElementById('metaAcertos').value, 10) || 0;
   let rows = [];
   SUNDAYS.forEach((d,i) => {
-    const entries = state.simulados[d] || {};
-    Object.keys(entries).forEach(nome => {
-      const e = entries[nome];
-      rows.push({ dia: `Sim. ${i+1} — ${fmtDate(d)}`, nome, acertos: e.acertos, tempo: e.tempo, ok: e.acertos >= meta });
+    resultadosCache.sim.filter(r => r.chave === d).forEach(r => {
+      rows.push({ dia: `Sim. ${i+1} — ${fmtDate(d)}`, nome: r.nome, acertos: r.acertos, tempo: r.tempo_min, ok: r.acertos >= meta });
     });
   });
   const el = document.getElementById('simuladoTable');
@@ -1798,7 +1803,7 @@ function abrirSimulado(date){
   renderSimuladoTable();
   updateGates();
 
-  const jaFez = currentStudent && state.simulados[date] && state.simulados[date][currentStudent];
+  const jaFez = currentStudent && buscarResultadoLocal('sim', date, currentStudent);
   if(jaFez){
     document.getElementById('simSetupArea').style.display = 'none';
     document.getElementById('simQuizArea').innerHTML = '<div class="card"><h2>Você já fez este simulado</h2>'
@@ -1806,7 +1811,7 @@ function abrirSimulado(date){
     document.getElementById('simResultCard').classList.add('show');
     const total = data ? data.questions.length : 50;
     document.getElementById('simScoreText').textContent = jaFez.acertos + '/' + total;
-    document.getElementById('simScoreDetail').textContent = Math.round(jaFez.acertos/total*100) + '% de acerto — tempo utilizado: ' + (jaFez.tempo || '—') + ' min. Sem nova tentativa disponível.';
+    document.getElementById('simScoreDetail').textContent = Math.round(jaFez.acertos/total*100) + '% de acerto — tempo utilizado: ' + (jaFez.tempo_min || '—') + ' min. Sem nova tentativa disponível.';
     return;
   }
 
@@ -1943,7 +1948,6 @@ async function init(){
   buildNav();
   try{ await loadStudent(); }catch(e){ console.error(e); }
   try{ await loadAll(); }catch(e){ console.error(e); }
-  try{ await loadCadernoErros(); }catch(e){ console.error(e); }
   renderRankingGeral();
   try{ await verificarMultasPendentes(); }catch(e){ console.error(e); }
   goToView('painel');
