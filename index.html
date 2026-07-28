@@ -450,11 +450,12 @@ function buscarResultadoLocal(tipo, chave, nome){
   return lista.find(r => r.chave === String(chave) && r.nome === nome) || null;
 }
 
-async function salvarResultado(tipo, chave, nome, acertos, total, tempoMin, respostas){
+async function salvarResultado(tipo, chave, nome, acertos, total, tempoMin, respostas, concluido, iniciadoEm){
   if(!supabaseClient){ mostrarErroSupabase('Sem conexão com o banco agora — o resultado não foi salvo.'); return false; }
-  const payload = { tipo, chave: String(chave), nome, acertos, total };
+  const payload = { tipo, chave: String(chave), nome, acertos, total, concluido: concluido !== false };
   if(tempoMin != null) payload.tempo_min = tempoMin;
   if(respostas != null) payload.respostas = respostas;
+  if(iniciadoEm != null) payload.iniciado_em = iniciadoEm;
   const { error } = await supabaseClient.from('resultados').upsert(payload, { onConflict: 'tipo,chave,nome' });
   if(error){ console.error(error); mostrarErroSupabase('Não foi possível salvar o resultado de "' + nome + '": ' + error.message); return false; }
   // atualiza o cache local pra refletir na hora, sem precisar recarregar tudo
@@ -1494,7 +1495,7 @@ let score = 0;
 let answered = [];
 let escolhas = [];
 
-function loadDay(day){
+async function loadDay(day){
   activeDay = day;
   renderTheory(day);
   const data = QUIZZES[day];
@@ -1503,9 +1504,11 @@ function loadDay(day){
   document.getElementById('resultCard').classList.remove('show');
   updateGates();
 
-  const jaRespondeu = currentStudent && buscarResultadoLocal('dia', day, currentStudent);
-  if(jaRespondeu){
-    activeQuestions = []; answered = []; escolhas = []; score = jaRespondeu.acertos;
+  const existente = currentStudent && buscarResultadoLocal('dia', day, currentStudent);
+
+  if(existente && existente.concluido !== false){
+    // Já concluído de verdade — mostra a revisão, sem nova tentativa.
+    activeQuestions = []; answered = []; escolhas = []; score = existente.acertos;
     document.getElementById('progressFill').style.width = '100%';
     const area = document.getElementById('quizArea');
     area.innerHTML = '';
@@ -1513,19 +1516,37 @@ function loadDay(day){
     aviso.className = 'card';
     aviso.innerHTML = '<h2>Você já respondeu este questionário</h2><p class="hint">Cada questionário só pode ser feito uma vez. Veja abaixo a revisão de todas as questões, com a alternativa que você marcou.</p>';
     area.appendChild(aviso);
-    if(jaRespondeu.respostas && jaRespondeu.respostas.length){
-      renderRevisaoEstatica(area, jaRespondeu.respostas);
+    if(existente.respostas && existente.respostas.length){
+      renderRevisaoEstatica(area, existente.respostas);
     }
     document.getElementById('resultCard').classList.add('show');
-    document.getElementById('scoreText').textContent = jaRespondeu.acertos + '/' + jaRespondeu.total;
-    document.getElementById('scoreDetail').textContent = Math.round(jaRespondeu.acertos/jaRespondeu.total*100) + '% de acerto — sem nova tentativa disponível.';
+    document.getElementById('scoreText').textContent = existente.acertos + '/' + existente.total;
+    document.getElementById('scoreDetail').textContent = Math.round(existente.acertos/existente.total*100) + '% de acerto — sem nova tentativa disponível.';
     return;
   }
 
+  if(existente && existente.concluido === false && existente.respostas && existente.respostas.length){
+    // Tem progresso salvo (não terminou ainda) — retoma exatamente de onde parou,
+    // com as mesmas questões/alternativas de antes, em vez de sortear de novo.
+    activeQuestions = existente.respostas.map(r => ({ sec: r.sec, q: r.q, opts: r.opts, correct: r.correct, exp: r.exp }));
+    escolhas = existente.respostas.map(r => (r.escolhida != null ? r.escolhida : null));
+    answered = escolhas.map(e => e != null);
+    score = existente.respostas.reduce((acc, r) => acc + (r.escolhida === r.correct ? 1 : 0), 0);
+    renderQuiz();
+    updateProgress();
+    return;
+  }
+
+  // Primeira vez nesse dia — sorteia e já salva o progresso inicial, pra um
+  // refresh antes de responder qualquer coisa continuar com o mesmo sorteio.
   activeQuestions = shuffleQuestions(shuffleWithinGroups(data.questions));
   score = 0;
   answered = new Array(activeQuestions.length).fill(false);
   escolhas = new Array(activeQuestions.length).fill(null);
+  if(currentStudent){
+    const respostasIniciais = activeQuestions.map(item => ({ sec: item.sec, q: item.q, opts: item.opts, correct: item.correct, escolhida: null, exp: item.exp }));
+    await salvarProgressoQuiz(currentStudent, day, 0, activeQuestions.length, respostasIniciais);
+  }
   renderQuiz();
   updateProgress();
 }
@@ -1596,22 +1617,35 @@ function renderQuiz(){
     qtext.textContent = item.q;
     card.appendChild(qtext);
     const letters = ['A','B','C','D'];
+    const jaFoiRespondida = !!answered[idx];
     item.opts.forEach((opt, oi) => {
       const row = document.createElement('div');
       row.className = 'opt';
       row.innerHTML = '<span class="letter">'+letters[oi]+'</span><span class="otext">'+opt+'</span>';
-      row.onclick = () => selectAnswer(idx, oi, row, card);
+      if(jaFoiRespondida){
+        row.classList.add('disabled');
+        if(oi === item.correct) row.classList.add('correct');
+        if(oi === escolhas[idx] && escolhas[idx] !== item.correct) row.classList.add('wrong');
+        if(oi !== item.correct && oi !== escolhas[idx]) row.classList.add('dim');
+      } else {
+        row.onclick = () => selectAnswer(idx, oi, row, card);
+      }
       card.appendChild(row);
     });
     const fb = document.createElement('div');
     fb.className = 'feedback';
     fb.id = 'fb'+idx;
+    if(jaFoiRespondida){
+      const acertou = escolhas[idx] === item.correct;
+      fb.className = 'feedback show ' + (acertou ? 'ok' : 'no');
+      fb.innerHTML = (acertou ? '<b>Correto.</b> ' : '<b>Errado.</b> A alternativa certa é a ' + letters[item.correct] + '. ') + item.exp;
+    }
     card.appendChild(fb);
     area.appendChild(card);
   });
 }
 
-function selectAnswer(qIdx, oIdx, row, card){
+async function selectAnswer(qIdx, oIdx, row, card){
   if(answered[qIdx]) return;
   answered[qIdx] = true;
   escolhas[qIdx] = oIdx;
@@ -1630,6 +1664,10 @@ function selectAnswer(qIdx, oIdx, row, card){
   fb.innerHTML = (isCorrect ? '<b>Correto.</b> ' : '<b>Errado.</b> A alternativa certa é a ' + ['A','B','C','D'][item.correct] + '. ') + item.exp;
   if(!isCorrect && currentStudent){
     registrarErro(currentStudent, item.sec, 'Dia ' + activeDay, item.q, item.opts, item.correct, oIdx, item.exp);
+  }
+  if(currentStudent){
+    const respostasAtuais = activeQuestions.map((q, i) => ({ sec: q.sec, q: q.q, opts: q.opts, correct: q.correct, escolhida: escolhas[i], exp: q.exp }));
+    await salvarProgressoQuiz(currentStudent, activeDay, score, activeQuestions.length, respostasAtuais);
   }
   updateProgress();
 }
@@ -1670,7 +1708,11 @@ async function finishQuiz(){
    RESULTADOS DE QUESTIONÁRIO (compartilhado, por aluno/dia)
    ========================================================= */
 async function saveQuizResult(nome, day, score, total, respostas){
-  await salvarResultado('dia', day, nome, score, total, null, respostas);
+  await salvarResultado('dia', day, nome, score, total, null, respostas, true);
+}
+
+async function salvarProgressoQuiz(nome, day, score, total, respostas){
+  await salvarResultado('dia', day, nome, score, total, null, respostas, false);
 }
 
 /* =========================================================
@@ -1769,7 +1811,11 @@ async function loadAll(){
 }
 
 async function saveSimuladoResult(nome, data, acertos, tempoMin, respostas){
-  await salvarResultado('sim', data, nome, acertos, 50, tempoMin, respostas);
+  await salvarResultado('sim', data, nome, acertos, 50, tempoMin, respostas, true);
+}
+
+async function salvarProgressoSimulado(nome, data, acertos, respostas, iniciadoEm){
+  await salvarResultado('sim', data, nome, acertos, 50, null, respostas, false, iniciadoEm);
 }
 
 function renderSimuladoTable(){
@@ -1843,6 +1889,7 @@ let simAnswered = [];
 let simEscolhas = [];
 let simSelectedDate = null;
 let simChosenDate = null;
+let simIniciadoEm = null;
 let simRunning = false;
 
 function abrirSimulado(date){
@@ -1861,8 +1908,9 @@ function abrirSimulado(date){
   renderSimuladoTable();
   updateGates();
 
-  const jaFez = currentStudent && buscarResultadoLocal('sim', date, currentStudent);
-  if(jaFez){
+  const existente = currentStudent && buscarResultadoLocal('sim', date, currentStudent);
+
+  if(existente && existente.concluido !== false){
     document.getElementById('simSetupArea').style.display = 'none';
     const area = document.getElementById('simQuizArea');
     area.innerHTML = '';
@@ -1870,13 +1918,18 @@ function abrirSimulado(date){
     aviso.className = 'card';
     aviso.innerHTML = '<h2>Você já fez este simulado</h2><p class="hint">Cada simulado só pode ser feito uma vez. Veja abaixo a revisão de todas as questões, com a alternativa que você marcou.</p>';
     area.appendChild(aviso);
-    if(jaFez.respostas && jaFez.respostas.length){
-      renderRevisaoEstatica(area, jaFez.respostas);
+    if(existente.respostas && existente.respostas.length){
+      renderRevisaoEstatica(area, existente.respostas);
     }
     document.getElementById('simResultCard').classList.add('show');
     const total = data ? data.questions.length : 50;
-    document.getElementById('simScoreText').textContent = jaFez.acertos + '/' + total;
-    document.getElementById('simScoreDetail').textContent = Math.round(jaFez.acertos/total*100) + '% de acerto — tempo utilizado: ' + (jaFez.tempo_min || '—') + ' min. Sem nova tentativa disponível.';
+    document.getElementById('simScoreText').textContent = existente.acertos + '/' + total;
+    document.getElementById('simScoreDetail').textContent = Math.round(existente.acertos/total*100) + '% de acerto — tempo utilizado: ' + (existente.tempo_min || '—') + ' min. Sem nova tentativa disponível.';
+    return;
+  }
+
+  if(existente && existente.concluido === false && existente.respostas && existente.respostas.length){
+    resumirSimulado(existente, data);
     return;
   }
 
@@ -1884,7 +1937,47 @@ function abrirSimulado(date){
   document.getElementById('simSetupArea').style.display = (data && currentStudent) ? '' : 'none';
 }
 
-function iniciarSimulado(){
+/* Retoma um simulado que já foi iniciado mas não terminado — usa as mesmas
+   questões/alternativas sorteadas antes e recalcula o tempo restante a
+   partir do horário real de início (não deixa "reiniciar" o cronômetro). */
+function resumirSimulado(existente, data){
+  simSelectedDate = simChosenDate;
+  simQuestions = existente.respostas.map(r => ({ sec: r.sec, q: r.q, opts: r.opts, correct: r.correct, exp: r.exp }));
+  simEscolhas = existente.respostas.map(r => (r.escolhida != null ? r.escolhida : null));
+  simAnswered = simEscolhas.map(e => e != null);
+  simScore = existente.respostas.reduce((acc, r) => acc + (r.escolhida === r.correct ? 1 : 0), 0);
+
+  const iniciadoEmMs = existente.iniciado_em ? new Date(existente.iniciado_em).getTime() : Date.now();
+  simIniciadoEm = existente.iniciado_em || new Date(iniciadoEmMs).toISOString();
+  const decorridoSeg = Math.floor((Date.now() - iniciadoEmMs) / 1000);
+  simSeconds = Math.max(0, 150*60 - decorridoSeg);
+
+  document.getElementById('simSetupArea').style.display = 'none';
+  document.getElementById('simTimerBox').style.display = '';
+  document.getElementById('simTimerLabel').textContent = (data ? data.label : '') + ' — cronômetro em andamento (retomado)';
+  document.getElementById('simResultCard').classList.remove('show');
+  updateSimTimerDisplay();
+  simRunning = true;
+  renderSimQuiz();
+
+  if(simAnswered.every(Boolean) || simSeconds <= 0){
+    simRunning = true; // finalizarSimulado espera simRunning=true pra processar
+    finalizarSimulado();
+    return;
+  }
+
+  if(simInterval) clearInterval(simInterval);
+  simInterval = setInterval(() => {
+    if(simSeconds > 0){
+      simSeconds--; updateSimTimerDisplay();
+    } else {
+      clearInterval(simInterval); simInterval = null; beep();
+      finalizarSimulado();
+    }
+  }, 1000);
+}
+
+async function iniciarSimulado(){
   if(!currentStudent){ alert('Selecione seu nome no topo da página primeiro.'); return; }
   const data = SIMULADOS[simChosenDate];
   if(!data) return;
@@ -1895,6 +1988,11 @@ function iniciarSimulado(){
   simEscolhas = new Array(simQuestions.length).fill(null);
   simSeconds = 150*60;
   simRunning = true;
+
+  const iniciadoEm = new Date().toISOString();
+  simIniciadoEm = iniciadoEm;
+  const respostasIniciais = simQuestions.map(item => ({ sec: item.sec, q: item.q, opts: item.opts, correct: item.correct, escolhida: null, exp: item.exp }));
+  await salvarProgressoSimulado(currentStudent, simSelectedDate, 0, respostasIniciais, iniciadoEm);
 
   document.getElementById('simSetupArea').style.display = 'none';
   document.getElementById('simTimerBox').style.display = '';
@@ -1944,22 +2042,35 @@ function renderSimQuiz(){
     qtext.textContent = item.q;
     card.appendChild(qtext);
     const letters = ['A','B','C','D'];
+    const jaFoiRespondida = !!simAnswered[idx];
     item.opts.forEach((opt, oi) => {
       const row = document.createElement('div');
       row.className = 'opt';
       row.innerHTML = '<span class="letter">'+letters[oi]+'</span><span class="otext">'+opt+'</span>';
-      row.onclick = () => selectSimAnswer(idx, oi, row, card);
+      if(jaFoiRespondida){
+        row.classList.add('disabled');
+        if(oi === item.correct) row.classList.add('correct');
+        if(oi === simEscolhas[idx] && simEscolhas[idx] !== item.correct) row.classList.add('wrong');
+        if(oi !== item.correct && oi !== simEscolhas[idx]) row.classList.add('dim');
+      } else {
+        row.onclick = () => selectSimAnswer(idx, oi, row, card);
+      }
       card.appendChild(row);
     });
     const fb = document.createElement('div');
     fb.className = 'feedback';
     fb.id = 'sfb'+idx;
+    if(jaFoiRespondida){
+      const acertou = simEscolhas[idx] === item.correct;
+      fb.className = 'feedback show ' + (acertou ? 'ok' : 'no');
+      fb.innerHTML = (acertou ? '<b>Correto.</b> ' : '<b>Errado.</b> A alternativa certa é a ' + letters[item.correct] + '. ') + item.exp;
+    }
     card.appendChild(fb);
     area.appendChild(card);
   });
 }
 
-function selectSimAnswer(qIdx, oIdx, row, card){
+async function selectSimAnswer(qIdx, oIdx, row, card){
   if(simAnswered[qIdx] || !simRunning) return;
   simAnswered[qIdx] = true;
   simEscolhas[qIdx] = oIdx;
@@ -1979,6 +2090,11 @@ function selectSimAnswer(qIdx, oIdx, row, card){
   if(!isCorrect && currentStudent){
     const simData = SIMULADOS[simChosenDate];
     registrarErro(currentStudent, item.sec, (simData ? simData.label : ('Simulado — ' + simChosenDate)), item.q, item.opts, item.correct, oIdx, item.exp);
+  }
+
+  if(currentStudent && simSelectedDate){
+    const respostasAtuais = simQuestions.map((q, i) => ({ sec: q.sec, q: q.q, opts: q.opts, correct: q.correct, escolhida: simEscolhas[i], exp: q.exp }));
+    await salvarProgressoSimulado(currentStudent, simSelectedDate, simScore, respostasAtuais, simIniciadoEm);
   }
 
   if(simAnswered.every(Boolean)){
