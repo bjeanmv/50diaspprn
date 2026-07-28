@@ -489,14 +489,14 @@ let currentStudent = null;
    o PDF estiver hospedado; deixe "" para o botão não aparecer.
    ========================================================= */
 const PDF_LINKS = {
-  1: "",
-  2: "",
-  3: "",
-  4: "",
-  5: "",
-  6: "",
-  7: "",
-  8: "",
+  1: "https://1drv.ms/b/c/ae845531f73f549f/IQB7NRbdRXkASI2Mims15O11Af9YI3IXXRibAAff369q1Qw?e=6gxfbY",
+  2: "https://1drv.ms/b/c/ae845531f73f549f/IQANk2coELnWTrnGZXc-SVt8AcEIjVP-Me8W2wE5Din6J4Q?e=ukWKLl",
+  3: "https://1drv.ms/b/c/ae845531f73f549f/IQC2Mw49NK4UQoLr5jJ9tXYLAVsCmm6b37Rc5NbJvMlfXZg?e=fDX8z2",
+  4: "https://1drv.ms/b/c/ae845531f73f549f/IQCY6JPMzjkKSI9SRnpFsbdJAdGowzduPd2bHzR-hVDlW6I?e=cbV94q",
+  5: "https://1drv.ms/b/c/ae845531f73f549f/IQCzdcIjXTZjTaHGR784KmBoAWMyfcDcI7WiLcQPQo1pJ_Y?e=S4v1sZ",
+  6: "https://1drv.ms/b/c/ae845531f73f549f/IQAMj4Kpz-n0SYpjP1c7tXQrAbisqKOdohfzbjGHAyj0hpw?e=vDeWZE",
+  7: "https://1drv.ms/b/c/ae845531f73f549f/IQDEJCwmE7IGRrMHaIm_1Mv9AXPoDeOu5oIhS2Vn1N55Gyc?e=LRimng",
+  8: "https://1drv.ms/b/c/ae845531f73f549f/IQAmY_akx7inToQDMJ13cxClAfSnkbGIwmYrtq56pR5LBCE?e=JgJClj",
 };
 
 const QUIZZES = {
@@ -1141,7 +1141,7 @@ async function aplicarMultaJanelaSeNecessario(tipo, dateStr, nome){
   } catch(e) {
     console.error(e);
     state.janelaMultas[key] = backupAntes; // desfaz a marcação local: não persistiu, então não aplicamos a multa agora
-    mostrarErroSupabase('Não foi possível registrar a marcação de multa neste dispositivo agora. A multa será tentada novamente mais tarde, para não cobrar em duplicidade.');
+    mostrarErroSupabase('Não foi possível registrar a marcação de multa neste dispositivo agora (' + (e && e.message ? e.message : 'erro desconhecido') + '). A multa será tentada novamente mais tarde, para não cobrar em duplicidade.');
     return;
   }
   await ajustarDiasFurados(nome, +1);
@@ -1190,7 +1190,7 @@ async function verificarMultasPendentes(){
   } catch(e) {
     console.error(e);
     state.janelaMultas = backup; // não persistiu — desfaz tudo, não aplica nenhuma multa agora
-    mostrarErroSupabase('Não foi possível registrar as marcações de multas pendentes agora. Serão tentadas novamente mais tarde, sem cobrar em duplicidade.');
+    mostrarErroSupabase('Não foi possível registrar as marcações de multas pendentes agora (' + (e && e.message ? e.message : 'erro desconhecido') + '). Serão tentadas novamente mais tarde, sem cobrar em duplicidade.');
     return;
   }
 
