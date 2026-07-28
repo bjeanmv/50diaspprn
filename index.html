@@ -160,7 +160,7 @@
 
     <div class="card">
       <h2>Painel de multas do grupo</h2>
-      <p class="hint">Cada dia furado marcado no check-in soma +1 na coluna de dias furados e gera multa. Multa fixa: R$ 1,00 por dia furado.</p>
+      <p class="hint">Cada dia furado marcado no check-in soma +1 na coluna <code>dias_furados</code> do Supabase. Multa fixa: R$ 1,00 por dia furado.</p>
       <table>
         <thead>
           <tr><th>Integrante</th><th>Dias furados</th><th>Multa total</th></tr>
@@ -179,7 +179,7 @@
         <p>Selecione seu nome no topo da página para registrar seu check-in.</p>
       </div>
       <div id="checkinFormArea">
-        <p class="hint">Registrando para: <b id="checkinQuemLabel">—</b>. Selecione a data do cronograma e marque se estudou. Marcar "Não estudei" soma +1 em dias furados (uma única vez por dia).</p>
+        <p class="hint">Registrando para: <b id="checkinQuemLabel">—</b>. Selecione a data do cronograma e marque se estudou. Marcar "Não estudei" soma +1 em <code>dias_furados</code> no Supabase (uma única vez por dia).</p>
         <div class="row" style="max-width:260px;">
           <div class="field">
             <label class="field-label" for="checkinData">Data</label>
@@ -200,7 +200,7 @@
   <div id="view-ranking-geral" style="display:none;">
     <div class="card">
       <p class="hint">
-        Todos os dados abaixo vêm diretamente da tabela e atualizam automaticamente
+        Todos os dados abaixo vêm diretamente da tabela <code>ranking_concurso</code> no Supabase e atualizam automaticamente
         sempre que alguém pontua em um questionário diário, em um simulado, ou tem um dia furado registrado.
       </p>
       <div class="btn-row">
@@ -210,7 +210,7 @@
 
     <div class="card">
       <h2>🏆 Ranking Geral (placar principal)</h2>
-      <p class="hint">Soma de pontos diários + pontos simulados, do maior para o menor. Inclui o total de multas acumuladas.</p>
+      <p class="hint">Soma de pontos_diarios + pontos_simulados, do maior para o menor. Inclui o total de multas acumuladas.</p>
       <table>
         <thead><tr><th>#</th><th>Integrante</th><th>Pontos diários</th><th>Pontos simulados</th><th>Total de pontos</th><th>Multas</th></tr></thead>
         <tbody id="rankingPrincipalTable"></tbody>
@@ -219,7 +219,7 @@
 
     <div class="card">
       <h2>📘 Ranking Diário</h2>
-      <p class="hint">Ordenado por pontos diários, do maior para o menor.</p>
+      <p class="hint">Ordenado por <code>pontos_diarios</code>, do maior para o menor.</p>
       <table>
         <thead><tr><th>#</th><th>Integrante</th><th>Pontos diários</th></tr></thead>
         <tbody id="rankingDiarioTable"></tbody>
@@ -228,7 +228,7 @@
 
     <div class="card">
       <h2>🕐 Ranking de Simulados</h2>
-      <p class="hint">Ordenado por pontos simulados, do maior para o menor.</p>
+      <p class="hint">Ordenado por <code>pontos_simulados</code>, do maior para o menor.</p>
       <table>
         <thead><tr><th>#</th><th>Integrante</th><th>Pontos simulados</th></tr></thead>
         <tbody id="rankingSimuladosPontosTable"></tbody>
@@ -481,6 +481,7 @@ let currentStudent = null;
 const QUIZZES = {
   1: {
     label: "Dia 1 — 24/07",
+    date: "2026-07-24",
     sub: "Legislação Específica (LC 122/1994, Art. 1º a 3º) + Língua Portuguesa (Interpretação de Texto)",
     disciplinas: ["Legislação Específica — LC 122/1994 (peso 2)", "Língua Portuguesa — Interpretação de Texto"],
     teoria: [
@@ -542,6 +543,7 @@ const QUIZZES = {
   },
   2: {
     label: "Dia 2 — 25/07",
+    date: "2026-07-25",
     sub: "Execução Penal (Lei 7.210/1984, Art. 1º a 4º) + Direito Penal (Princípios e aplicação da lei penal no tempo e no espaço)",
     disciplinas: ["Execução Penal — Lei 7.210/1984 (peso 2)", "Direito Penal e Processo Penal — Parte Geral (peso 2)"],
     teoria: [
@@ -605,6 +607,7 @@ const QUIZZES = {
   },
   3: {
     label: "Dia 3 — 27/07",
+    date: "2026-07-27",
     sub: "Legislação Específica (LC 122/1994 — Ingresso, Provimento e Posse, Art. 4º a 21) + Direito Constitucional (Princípios Fundamentais da CF/88, Art. 1º a 4º)",
     disciplinas: ["Legislação Específica — LC 122/1994 (peso 2)", "Direito Constitucional"],
     teoria: [
@@ -664,6 +667,72 @@ const QUIZZES = {
       {sec:"const", q:"Segundo o Art. 2º da CF/88, a relação entre os Poderes Legislativo, Executivo e Judiciário caracteriza-se pela:", opts:["subordinação hierárquica do Judiciário ao Executivo","independência e harmonia entre eles","fusão de funções em um único órgão","subordinação do Legislativo ao Judiciário"], correct:1, exp:"O Art. 2º consagra a separação de Poderes com independência e harmonia entre eles."},
       {sec:"const", q:"Entre os princípios das relações internacionais do Art. 4º da CF/88, encontra-se a concessão de:", opts:["cidadania automática a estrangeiros","asilo político","anistia irrestrita a crimes internacionais","extradição obrigatória em qualquer hipótese"], correct:1, exp:"Art. 4º, X, da CF/88: concessão de asilo político."},
       {sec:"const", q:"Considere: I) A soberania é fundamento da República Federativa do Brasil (Art. 1º). II) A construção de uma sociedade livre, justa e solidária é objetivo fundamental da República (Art. 3º). Está(ão) correta(s):", opts:["apenas I","apenas II","I e II","nenhuma"], correct:2, exp:"Ambas as afirmativas classificam corretamente os institutos entre fundamento (Art. 1º) e objetivo (Art. 3º)."}
+    ]
+  },
+  4: {
+    label: "Dia 4 — 28/07",
+    date: "2026-07-28",
+    sub: "Execução Penal (LEP — Assistência ao preso, Art. 10 a 27) + Língua Portuguesa (Classes Gramaticais)",
+    disciplinas: ["Execução Penal — Lei 7.210/1984 (peso 2)", "Língua Portuguesa — Classes Gramaticais"],
+    teoria: [
+      {
+        titulo: "Execução Penal — Assistência ao Preso (LEP, Art. 10 a 27)",
+        palavrasChave: ["Assistência material", "Assistência à saúde", "Assistência jurídica", "Assistência educacional", "Assistência social", "Assistência religiosa", "Egresso"],
+        paragrafos: [
+          "A assistência ao preso e ao internado é <b>dever do Estado</b> (Art. 10), com o objetivo de prevenir o crime e orientar o retorno à convivência em sociedade. A assistência se estende também ao <b>egresso</b>.",
+          "São seis modalidades de assistência (Art. 11): <b>material</b> (alimentação, vestuário, instalações higiênicas), <b>à saúde</b> (atendimento médico, farmacêutico e odontológico, de caráter preventivo e curativo), <b>jurídica</b> (destinada a quem não tem recursos para advogado, prestada pela Defensoria Pública), <b>educacional</b> (instrução escolar e formação profissional), <b>social</b> (amparo e preparação para o retorno à liberdade) e <b>religiosa</b> (liberdade de culto, sem obrigatoriedade).",
+          "A assistência à saúde da mulher presa deve garantir acompanhamento médico, principalmente no pré-natal e no pós-parto, estendido ao recém-nascido.",
+          "O ensino fundamental é <b>obrigatório</b> para os presos, integrando-se ao sistema escolar da unidade federativa — a assistência educacional não é uma faculdade da administração, e sim uma obrigação legal quanto a esse nível de ensino.",
+          "A assistência religiosa garante a liberdade de culto e a posse de livros religiosos, mas nenhum preso pode ser <b>obrigado</b> a recebê-la — é direito, não imposição.",
+          "O <b>egresso</b> (Art. 25-26) é o liberado definitivo (pelo prazo de 1 ano a contar da saída) ou o liberado condicional (durante o período de prova) — a assistência ao egresso inclui orientação e apoio para reintegração e, quando necessário, auxílio para obtenção de moradia."
+        ],
+        mnemonico: "As 6 assistências, em ordem do Art. 11: <b>MA-SA-JU-E-SO-RE</b> — MAterial, SAúde, JUrídica, Educacional, SOcial, REligiosa. E lembre: religiosa é a única que ninguém pode ser OBRIGADO a receber."
+      },
+      {
+        titulo: "Língua Portuguesa — Classes Gramaticais",
+        palavrasChave: ["Substantivo", "Adjetivo", "Artigo", "Numeral", "Pronome", "Verbo", "Advérbio", "Preposição", "Conjunção", "Interjeição"],
+        paragrafos: [
+          "A gramática tradicional reconhece <b>10 classes de palavras</b>, divididas em <b>variáveis</b> (mudam de forma: substantivo, adjetivo, artigo, numeral, pronome, verbo) e <b>invariáveis</b> (não flexionam: advérbio, preposição, conjunção, interjeição).",
+          "O <b>substantivo</b> pode ser comum ou próprio, concreto ou abstrato, e coletivo (designa um conjunto, mesmo no singular). O <b>adjetivo</b> caracteriza o substantivo, incluindo os adjetivos pátrios (relativos a nações/lugares).",
+          "Os <b>pronomes</b> se subdividem em pessoais, possessivos, demonstrativos, relativos, indefinidos, interrogativos e de tratamento — cada categoria tem função sintática própria.",
+          "Os <b>verbos</b> classificam-se, entre outros critérios, em regulares/irregulares (quanto à flexão) e transitivos/intransitivos (quanto à necessidade de complemento).",
+          "As <b>conjunções</b> dividem-se em coordenativas (ligam termos/orações de mesmo valor sintático) e subordinativas (ligam uma oração dependente a outra) — confundir essa classificação é um erro comum em provas."
+        ],
+        mnemonico: "Para lembrar as classes VARIÁVEIS: <b>SAAN-PV</b> (Substantivo, Adjetivo, Artigo, Numeral, Pronome, Verbo). As INVARIÁVEIS sobram: Advérbio, Preposição, Conjunção, Interjeição — se flexiona, é variável; se não, é invariável."
+      }
+    ],
+    questions: [
+      {sec:"exec", q:"Segundo a LEP, a assistência ao preso e ao internado constitui:", opts:["faculdade da administração penitenciária, dispensável conforme a disponibilidade orçamentária","recomendação de organismos internacionais, sem força vinculante no direito interno","dever do Estado, destinado a prevenir o crime e orientar o retorno à convivência social","atribuição exclusiva de entidades religiosas, sem qualquer participação estatal direta"], correct:2, exp:"Art. 10 da LEP: a assistência é dever do Estado, e não faculdade ou atribuição de terceiros."},
+      {sec:"exec", q:"São modalidades de assistência previstas no Art. 11 da LEP:", opts:["material, à saúde, jurídica, educacional, social e religiosa","apenas material e à saúde, sendo as demais espécies de benefício, não de assistência","psicológica, financeira, alimentar e trabalhista","apenas jurídica e educacional, por serem as mais custosas ao Estado"], correct:0, exp:"O Art. 11 lista exatamente essas seis modalidades — nenhuma outra classificação alternativa consta da lei."},
+      {sec:"exec", q:"A assistência material ao preso, segundo a LEP, consiste no fornecimento de:", opts:["apenas vestuário, ficando a alimentação a cargo de terceiros","alimentação, vestuário e instalações higiênicas","exclusivamente recursos financeiros mensais","apenas mobiliário para a cela"], correct:1, exp:"Art. 12 da LEP: a assistência material abrange alimentação, vestuário e instalações higiênicas."},
+      {sec:"exec", q:"Sobre a assistência à saúde do preso, é correto afirmar que, segundo a LEP:", opts:["tem caráter exclusivamente curativo, dispensando qualquer medida de prevenção","compreende atendimento médico, farmacêutico e odontológico, de caráter preventivo e curativo","limita-se a encaminhamentos externos, sem qualquer estrutura de atendimento interno","é prestada apenas em situações de emergência com risco iminente de morte"], correct:1, exp:"Art. 14, caput, da LEP: assistência preventiva e curativa, com atendimento médico, farmacêutico e odontológico."},
+      {sec:"exec", q:"Quando o estabelecimento penal não estiver aparelhado para prover a assistência médica necessária, a LEP determina que essa assistência:", opts:["deixará de ser prestada até que ocorra a transferência definitiva do preso","será prestada em outro local, mediante autorização da direção do estabelecimento","será substituída por indenização financeira mensal em favor do preso","ficará suspensa até que sobrevenha decisão judicial específica sobre o caso"], correct:1, exp:"Art. 14, §2º, da LEP autoriza o atendimento externo mediante autorização da direção."},
+      {sec:"exec", q:"Segundo a LEP, a assistência jurídica é destinada:", opts:["a todos os presos, independentemente de sua condição financeira ou patrimonial","aos presos e internados sem recursos financeiros para constituir advogado particular","exclusivamente aos presos que cumprem pena em regime fechado","apenas aos presos que ainda não foram sentenciados definitivamente"], correct:1, exp:"Art. 15 da LEP restringe a assistência jurídica estatal a quem não tem recursos para advogado particular."},
+      {sec:"exec", q:"A assistência jurídica integral e gratuita ao preso, no estabelecimento penal, deve ser estruturada, segundo a LEP, por meio de serviços vinculados:", opts:["ao Ministério Público, exclusivamente","à Defensoria Pública","à Ordem dos Advogados do Brasil, obrigatoriamente","a escritórios de advocacia contratados por licitação"], correct:1, exp:"Art. 16 da LEP atribui esse serviço à Defensoria Pública das Unidades da Federação."},
+      {sec:"exec", q:"Sobre a assistência educacional, é correto afirmar que, segundo a LEP:", opts:["compreende apenas cursos de formação profissional, excluída a instrução escolar","compreende a instrução escolar e a formação profissional do preso e do internado","é restrita aos presos que ainda não concluíram o ensino médio","é inteiramente facultativa, inclusive quanto ao ensino fundamental"], correct:1, exp:"Art. 17 da LEP: a assistência educacional abrange tanto a instrução escolar quanto a formação profissional."},
+      {sec:"exec", q:"Quanto ao ensino fundamental no ambiente prisional, a LEP estabelece que ele é:", opts:["facultativo, a critério da direção do estabelecimento","obrigatório, integrando-se ao sistema escolar da Unidade Federativa","opcional, condicionado à disponibilidade orçamentária","restrito a presos com menos de 30 anos de idade"], correct:1, exp:"Art. 18 da LEP torna o ensino fundamental obrigatório, e não facultativo."},
+      {sec:"exec", q:"Segundo a LEP, as atividades educacionais no sistema prisional podem ser objeto de:", opts:["convênio entre a administração pública e entidades públicas ou particulares","apenas execução direta pelo Estado, sem qualquer parceria","contratação exclusiva de professores da rede estadual, sem convênios","proibição de qualquer parceria com entidades privadas"], correct:0, exp:"A LEP admite expressamente convênios com entidades públicas ou particulares para as atividades educacionais."},
+      {sec:"exec", q:"A finalidade da assistência social ao preso e ao internado, segundo a LEP, é:", opts:["fiscalizar exclusivamente o comportamento disciplinar","amparar o preso e o internado e prepará-los para o retorno à liberdade","substituir a atuação do Conselho Penitenciário","limitar-se ao acompanhamento de processos judiciais"], correct:1, exp:"Art. 22 da LEP define essa finalidade dupla: amparo e preparação para a liberdade."},
+      {sec:"exec", q:"Sobre a assistência religiosa, é correto afirmar que a LEP assegura liberdade de culto, mas:", opts:["torna obrigatória a participação em ao menos uma atividade religiosa mensal","veda qualquer manifestação religiosa dentro do estabelecimento","nenhum preso pode ser obrigado a recebê-la","restringe a assistência a uma única confissão religiosa oficial"], correct:2, exp:"Art. 24, §2º, da LEP: a assistência religiosa é livre, e nenhum preso é obrigado a recebê-la."},
+      {sec:"exec", q:"Considera-se egresso, para os fins da assistência prevista na LEP:", opts:["apenas o condenado que já cumpriu integralmente a pena em regime fechado","o liberado definitivo (1 ano da saída) e o liberado condicional (durante o período de prova)","qualquer pessoa que já tenha sido presa alguma vez, sem qualquer limite de tempo fixado","apenas quem obteve indulto presidencial ou comutação judicial da pena imposta"], correct:1, exp:"Arts. 25 e 26 da LEP definem essas duas categorias de egresso, com prazos distintos."},
+      {sec:"exec", q:"Entre as providências da assistência ao egresso previstas na LEP, inclui-se:", opts:["a concessão de auxílio para obtenção de moradia, quando necessário","a garantia de emprego vitalício em órgão público federal ou estadual","a isenção permanente e automática de antecedentes criminais","a doação de imóvel residencial pelo Estado ao egresso"], correct:0, exp:"A LEP prevê auxílio para moradia como parte do apoio à reintegração do egresso, não as demais hipóteses."},
+      {sec:"exec", q:"Assinale a alternativa correta sobre a relação entre assistência material e assistência à saúde, segundo a sistemática da LEP:", opts:["tratam-se exatamente da mesma modalidade de assistência, apenas com nomes diferentes","são modalidades distintas: a material cobre necessidades básicas; a saúde cobre atendimento médico e odontológico","a assistência à saúde abrange e absorve por completo a assistência material do preso","apenas a assistência à saúde possui previsão legal; a material é mera prática administrativa informal"], correct:1, exp:"Arts. 12 e 14 da LEP tratam de modalidades autônomas, com objetos distintos."},
+
+      {sec:"port", q:"As classes de palavras que se flexionam (variam em gênero, número, grau ou pessoa) são denominadas:", opts:["classes invariáveis","classes variáveis","classes conectivas","classes interjectivas"], correct:1, exp:"Substantivo, adjetivo, artigo, numeral, pronome e verbo são as seis classes variáveis da gramática tradicional."},
+      {sec:"port", q:"Assinale a alternativa que reúne exclusivamente classes gramaticais invariáveis:", opts:["substantivo, verbo, artigo e pronome","advérbio, preposição, conjunção e interjeição","adjetivo, numeral, substantivo e verbo","pronome, artigo, adjetivo e advérbio"], correct:1, exp:"As quatro classes invariáveis são exatamente advérbio, preposição, conjunção e interjeição."},
+      {sec:"port", q:"Um substantivo que designa um conjunto de seres da mesma espécie, mesmo estando flexionado no singular, é classificado como:", opts:["substantivo abstrato","substantivo coletivo","substantivo composto","substantivo primitivo"], correct:1, exp:"Substantivo coletivo nomeia um conjunto (ex.: cardume, enxame), independentemente de estar no singular."},
+      {sec:"port", q:"Adjetivos que indicam a nacionalidade, a origem ou o local de procedência de algo ou alguém são chamados de:", opts:["adjetivos pátrios","adjetivos compostos","adjetivos primitivos","adjetivos superlativos"], correct:0, exp:"Adjetivo pátrio é a categoria que expressa nacionalidade/origem (ex.: brasileiro, potiguar)."},
+      {sec:"port", q:"Considere as afirmações: I) Pronomes possessivos indicam posse. II) Pronomes relativos retomam um termo antecedente, introduzindo uma oração subordinada. Está(ão) correta(s):", opts:["apenas I","apenas II","I e II","nenhuma"], correct:2, exp:"Ambas as definições correspondem corretamente às respectivas subclasses de pronomes."},
+      {sec:"port", q:"Verbos que não exigem complemento para ter sentido completo na oração são classificados, quanto à predicação, como:", opts:["transitivos diretos","transitivos indiretos","intransitivos","de ligação"], correct:2, exp:"Verbos intransitivos têm sentido completo por si mesmos, sem exigir objeto direto ou indireto."},
+      {sec:"port", q:"Assinale a alternativa que classifica corretamente as conjunções quanto à sua função sintática:", opts:["coordenativas ligam termos ou orações de mesmo valor sintático; subordinativas ligam uma oração dependente a outra","coordenativas introduzem, sempre e exclusivamente, orações subordinadas de valor adverbial","subordinativas ligam apenas palavras isoladas, nunca orações inteiras entre si","não existe qualquer distinção funcional relevante entre esses dois tipos de conjunção"], correct:0, exp:"Essa é exatamente a distinção funcional entre conjunções coordenativas e subordinativas."},
+      {sec:"port", q:"A palavra \"rapidamente\", em uma frase como \"ele correu rapidamente\", pertence à classe gramatical do(a):", opts:["adjetivo","advérbio","substantivo","pronome"], correct:1, exp:"\"Rapidamente\" modifica o verbo, indicando modo — é advérbio, e não adjetivo."},
+      {sec:"port", q:"Sobre os artigos definidos e indefinidos, é correto afirmar que:", opts:["ambos indicam exatamente o mesmo grau de determinação em relação ao substantivo","o definido indica algo já conhecido ou específico; o indefinido indica algo genérico ou não especificado","apenas o artigo definido é reconhecido como uma classe gramatical autônoma","os artigos indefinidos, ao contrário dos definidos, não variam em gênero e número"], correct:1, exp:"Essa é a distinção semântica clássica entre artigo definido (\"o\", \"a\") e indefinido (\"um\", \"uma\")."},
+      {sec:"port", q:"Numerais que indicam a ordem/posição em uma sequência (ex.: primeiro, segundo) são classificados como numerais:", opts:["cardinais","ordinais","multiplicativos","fracionários"], correct:1, exp:"Numeral ordinal expressa posição em uma sequência; cardinal expressa quantidade."},
+      {sec:"port", q:"A interjeição, entre as classes gramaticais, caracteriza-se por:", opts:["flexionar-se regularmente em gênero e número, à semelhança do substantivo","expressar emoções ou estados afetivos, de forma geralmente isolada na frase","ligar duas orações de mesmo valor sintático dentro de um mesmo período","exercer, dentro da oração, a função sintática de sujeito"], correct:1, exp:"Interjeições (ex.: \"ah!\", \"socorro!\") expressam emoção, sem flexão e sem função sintática integrada à oração."},
+      {sec:"port", q:"Pronomes de tratamento, como \"Vossa Senhoria\" e \"Vossa Excelência\", concordam verbalmente:", opts:["na primeira pessoa do singular, sempre","na segunda pessoa do plural, sempre","na terceira pessoa, ainda que se refiram ao interlocutor","na primeira pessoa do plural, por regra de cortesia"], correct:2, exp:"Embora se refiram ao interlocutor (2ª pessoa do discurso), pronomes de tratamento exigem concordância verbal na 3ª pessoa."},
+      {sec:"port", q:"Assinale a alternativa correta sobre a preposição \"para\" na frase \"Este presente é para você\":", opts:["classifica-se, nessa frase, como conjunção subordinativa integrante","classifica-se como preposição, introduzindo um termo com valor de destinação","classifica-se, nesse contexto, como advérbio indicador de lugar","classifica-se, na frase, como pronome relativo retomando um antecedente"], correct:1, exp:"\"Para\" é preposição, ligando o termo \"você\" ao restante da oração com valor de destinação."},
+      {sec:"port", q:"Sobre a diferença entre substantivo concreto e abstrato, é correto afirmar que:", opts:["concreto nomeia seres de existência própria; abstrato nomeia qualidades, ações ou estados","o substantivo concreto é sempre próprio, e o abstrato é sempre comum, sem exceção","abstrato refere-se exclusivamente a sentimentos; concreto, apenas a objetos físicos visíveis","não existe qualquer distinção formal reconhecida entre essas duas categorias na gramática"], correct:0, exp:"Essa é a definição clássica: concreto tem existência independente da mente que o concebe; abstrato depende dessa concepção (ex.: beleza, coragem)."},
+      {sec:"port", q:"Verbos irregulares, quanto à flexão, caracterizam-se por:", opts:["manterem o radical absolutamente inalterado em todas as conjugações e tempos verbais","sofrerem alterações no radical ou nas desinências que os afastam do padrão regular","não admitirem, em nenhuma hipótese, flexão de modo, tempo ou pessoa","serem, por definição gramatical, sempre classificados como transitivos diretos"], correct:1, exp:"Verbo irregular é aquele cuja flexão se desvia do padrão regular da respectiva conjugação (ex.: \"fazer\", \"ir\")."}
     ]
   }
   /* Próximo dia: adicionar aqui, ex.:
@@ -740,6 +809,55 @@ const SIMULADOS = {
   "2026-08-02": { label:"Simulado 2 — 02/08", disciplinas:[...], questions:[...] }
   */
 };
+
+/* =========================================================
+   JANELA DO DESAFIO — cada dia/simulado fica "aberto" das 18h
+   do dia vigente até as 03h do dia seguinte. Responder fora
+   dessa janela não bloqueia, mas gera multa (dias_furados).
+   ========================================================= */
+function getJanela(dateStr){
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const abre = new Date(y, m - 1, d, 18, 0, 0);
+  const fecha = new Date(y, m - 1, d, 27, 0, 0); // 27h = 03h do dia seguinte
+  return { abre, fecha };
+}
+function statusJanela(dateStr){
+  if(!dateStr) return { estado: 'sem-data' };
+  const { abre, fecha } = getJanela(dateStr);
+  const agora = new Date();
+  if(agora < abre) return { estado: 'ainda-nao-abriu', abre, fecha };
+  if(agora > fecha) return { estado: 'encerrada', abre, fecha };
+  return { estado: 'aberta', abre, fecha };
+}
+function fmtHora(dt){
+  return String(dt.getHours()).padStart(2,'0') + 'h' + (dt.getMinutes() ? String(dt.getMinutes()).padStart(2,'0') : '');
+}
+function fmtDataCurta(dt){
+  return String(dt.getDate()).padStart(2,'0') + '/' + String(dt.getMonth()+1).padStart(2,'0');
+}
+function descricaoJanela(dateStr){
+  const s = statusJanela(dateStr);
+  if(s.estado === 'sem-data') return '';
+  if(s.estado === 'ainda-nao-abriu') return `Abre às ${fmtHora(s.abre)} de ${fmtDataCurta(s.abre)}`;
+  if(s.estado === 'aberta') return `Aberto até ${fmtHora(s.fecha)} de ${fmtDataCurta(s.fecha)}`;
+  return `Encerrado desde ${fmtHora(s.fecha)} de ${fmtDataCurta(s.fecha)} — respondendo agora conta multa`;
+}
+
+/* Aplica multa (dias_furados) quando o aluno responde fora da janela — no máximo
+   uma vez por aluno/dia/simulado, controlado localmente em state.janelaMultas. */
+async function aplicarMultaJanelaSeNecessario(tipo, dateStr, nome){
+  if(!nome || !dateStr) return;
+  const dentro = statusJanela(dateStr).estado === 'aberta';
+  if(dentro) return;
+  const key = tipo + ':' + dateStr;
+  if(!state.janelaMultas) state.janelaMultas = {};
+  if(!state.janelaMultas[key]) state.janelaMultas[key] = {};
+  if(state.janelaMultas[key][nome]) return; // já multado uma vez por essa janela
+  state.janelaMultas[key][nome] = true;
+  try{ await window.storage.set('janelaMultas', JSON.stringify(state.janelaMultas), true); }
+  catch(e){ console.error(e); }
+  await ajustarDiasFurados(nome, +1);
+}
 
 function secLabel(sec){
   const map = { leg: "Legislação Específica", port: "Língua Portuguesa", exec: "Execução Penal", penal: "Direito Penal e Processo Penal", const: "Direito Constitucional" };
@@ -878,7 +996,13 @@ function popularListaDias(){
   if(dias.length === 0){ el.innerHTML = '<div class="empty">Nenhum dia disponível ainda.</div>'; return; }
   el.innerHTML = dias.map(day => {
     const data = QUIZZES[day];
-    return `<button onclick="abrirDia('${day}')">${data.label}</button>`;
+    const st = data.date ? statusJanela(data.date) : null;
+    const cor = st ? (st.estado === 'aberta' ? 'var(--success)' : (st.estado === 'encerrada' ? 'var(--danger)' : 'var(--muted)')) : 'var(--muted)';
+    const desc = data.date ? descricaoJanela(data.date) : '';
+    return `<div style="display:flex;flex-direction:column;gap:3px;">
+      <button onclick="abrirDia('${day}')">${data.label}</button>
+      ${desc ? `<span style="font-size:10.5px;color:${cor};text-align:center;">${desc}</span>` : ''}
+    </div>`;
   }).join('');
 }
 
@@ -886,7 +1010,8 @@ function abrirDia(day){
   hideAllViews();
   document.getElementById('view-quiz').style.display = '';
   document.getElementById('pageTitle').textContent = 'Dia ' + day + ' — ' + QUIZZES[day].label.split('—')[1].trim();
-  document.getElementById('pageSub').textContent = QUIZZES[day].sub;
+  const desc = QUIZZES[day].date ? (' · ' + descricaoJanela(QUIZZES[day].date)) : '';
+  document.getElementById('pageSub').textContent = QUIZZES[day].sub + desc;
   loadDay(day);
 }
 
@@ -895,9 +1020,16 @@ function popularListaSimulados(){
   el.innerHTML = SUNDAYS.map((d,i) => {
     const disponivel = !!SIMULADOS[d];
     const label = disponivel ? SIMULADOS[d].label : ('Simulado ' + (i+1) + ' — ' + fmtDate(d) + ' (em breve)');
-    return disponivel
-      ? `<button onclick="abrirSimulado('${d}')">${label}</button>`
-      : `<button disabled style="opacity:.45;cursor:default;">${label}</button>`;
+    if(!disponivel){
+      return `<button disabled style="opacity:.45;cursor:default;">${label}</button>`;
+    }
+    const st = statusJanela(d);
+    const cor = st.estado === 'aberta' ? 'var(--success)' : (st.estado === 'encerrada' ? 'var(--danger)' : 'var(--muted)');
+    const desc = descricaoJanela(d);
+    return `<div style="display:flex;flex-direction:column;gap:3px;">
+      <button onclick="abrirSimulado('${d}')">${label}</button>
+      <span style="font-size:10.5px;color:${cor};text-align:center;">${desc}</span>
+    </div>`;
   }).join('');
 }
 
@@ -1017,12 +1149,16 @@ async function finishQuiz(){
   if(pct >= 80) msg = 'Excelente domínio do conteúdo deste dia.';
   else if(pct >= 60) msg = 'Bom desempenho — revise os pontos que errou antes do simulado semanal.';
   else msg = 'Vale revisar a teoria deste dia antes de seguir para o próximo tópico.';
+  const dateStr = QUIZZES[activeDay] && QUIZZES[activeDay].date;
+  const foraDaJanela = dateStr && statusJanela(dateStr).estado !== 'aberta';
+  if(foraDaJanela) msg += ' Atenção: respondido fora da janela do desafio (18h–03h) — multa de R$ 1,00 aplicada.';
   document.getElementById('scoreDetail').textContent = pct + '% de acerto — ' + msg;
   card.scrollIntoView({behavior:'smooth', block:'center'});
 
   if(currentStudent){
     await saveQuizResult(currentStudent, activeDay, score, total);
     await ganharPontosDiarios(currentStudent, score);
+    if(dateStr) await aplicarMultaJanelaSeNecessario('dia', dateStr, currentStudent);
   }
 }
 
@@ -1050,7 +1186,7 @@ async function saveQuizResult(nome, day, score, total){
    PAINEL DE SIMULADOS (compartilhado)
    ========================================================= */
 const SUNDAYS = ["2026-07-26","2026-08-02","2026-08-09","2026-08-16","2026-08-23","2026-08-30","2026-09-06"];
-let state = { simulados: {}, checkins: {} };
+let state = { simulados: {}, checkins: {}, janelaMultas: {} };
 
 function fmtDate(iso){
   const [y,m,d] = iso.split("-");
@@ -1060,6 +1196,7 @@ function fmtDate(iso){
 async function loadAll(){
   try{ const r = await window.storage.get('simulados', true); state.simulados = r ? JSON.parse(r.value) : {}; }catch(e){ state.simulados = {}; }
   try{ const r = await window.storage.get('checkins', true); state.checkins = r ? JSON.parse(r.value) : {}; }catch(e){ state.checkins = {}; }
+  try{ const r = await window.storage.get('janelaMultas', true); state.janelaMultas = r ? JSON.parse(r.value) : {}; }catch(e){ state.janelaMultas = {}; }
   await loadQuizResults();
   renderAll();
 }
@@ -1199,7 +1336,7 @@ function abrirSimulado(date){
   document.getElementById('view-simulado').style.display = '';
   const data = SIMULADOS[date];
   document.getElementById('pageTitle').textContent = data ? data.label : ('Simulado — ' + fmtDate(date));
-  document.getElementById('pageSub').textContent = '50 questões · cronômetro de 2h30 · Foco na Missão';
+  document.getElementById('pageSub').textContent = '50 questões · cronômetro de 2h30 · ' + descricaoJanela(date);
   document.getElementById('simTituloAtual').textContent = data ? data.label : ('Simulado — ' + fmtDate(date));
   simChosenDate = date;
   simRunning = false;
@@ -1318,13 +1455,17 @@ async function finalizarSimulado(){
   card.classList.add('show');
   document.getElementById('simScoreText').textContent = simScore + '/' + total;
   const pct = Math.round(simScore/total*100);
-  document.getElementById('simScoreDetail').textContent = pct + '% de acerto — tempo utilizado: ' + elapsedMin + ' min.';
+  let detalhe = pct + '% de acerto — tempo utilizado: ' + elapsedMin + ' min.';
+  const foraDaJanela = simSelectedDate && statusJanela(simSelectedDate).estado !== 'aberta';
+  if(foraDaJanela) detalhe += ' Atenção: respondido fora da janela do desafio (18h–03h) — multa de R$ 1,00 aplicada.';
+  document.getElementById('simScoreDetail').textContent = detalhe;
   card.scrollIntoView({behavior:'smooth', block:'center'});
 
   if(currentStudent && simSelectedDate){
     await saveSimuladoResult(currentStudent, simSelectedDate, simScore, elapsedMin);
     renderSimuladoTable();
     await ganharPontosSimulados(currentStudent, simScore);
+    await aplicarMultaJanelaSeNecessario('sim', simSelectedDate, currentStudent);
   }
 }
 
