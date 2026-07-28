@@ -450,10 +450,11 @@ function buscarResultadoLocal(tipo, chave, nome){
   return lista.find(r => r.chave === String(chave) && r.nome === nome) || null;
 }
 
-async function salvarResultado(tipo, chave, nome, acertos, total, tempoMin){
+async function salvarResultado(tipo, chave, nome, acertos, total, tempoMin, respostas){
   if(!supabaseClient){ mostrarErroSupabase('Sem conexão com o banco agora — o resultado não foi salvo.'); return false; }
   const payload = { tipo, chave: String(chave), nome, acertos, total };
   if(tempoMin != null) payload.tempo_min = tempoMin;
+  if(respostas != null) payload.respostas = respostas;
   const { error } = await supabaseClient.from('resultados').upsert(payload, { onConflict: 'tipo,chave,nome' });
   if(error){ console.error(error); mostrarErroSupabase('Não foi possível salvar o resultado de "' + nome + '": ' + error.message); return false; }
   // atualiza o cache local pra refletir na hora, sem precisar recarregar tudo
@@ -787,37 +788,37 @@ const QUIZZES = {
       }
     ],
     questions: [
-      {sec:"exec", q:"Segundo a LEP, a assistência ao preso e ao internado constitui:", opts:["faculdade da administração penitenciária, dispensável conforme a disponibilidade orçamentária","recomendação de organismos internacionais, sem força vinculante no direito interno","dever do Estado, destinado a prevenir o crime e orientar o retorno à convivência social","atribuição exclusiva de entidades religiosas, sem qualquer participação estatal direta"], correct:2, exp:"Art. 10 da LEP: a assistência é dever do Estado, e não faculdade ou atribuição de terceiros."},
-      {sec:"exec", q:"São modalidades de assistência previstas no Art. 11 da LEP:", opts:["material, à saúde, jurídica, educacional, social e religiosa","apenas material e à saúde, sendo as demais espécies de benefício, não de assistência","psicológica, financeira, alimentar e trabalhista","apenas jurídica e educacional, por serem as mais custosas ao Estado"], correct:0, exp:"O Art. 11 lista exatamente essas seis modalidades — nenhuma outra classificação alternativa consta da lei."},
-      {sec:"exec", q:"A assistência material ao preso, segundo a LEP, consiste no fornecimento de:", opts:["apenas vestuário, ficando a alimentação a cargo de terceiros","alimentação, vestuário e instalações higiênicas","exclusivamente recursos financeiros mensais","apenas mobiliário para a cela"], correct:1, exp:"Art. 12 da LEP: a assistência material abrange alimentação, vestuário e instalações higiênicas."},
-      {sec:"exec", q:"Sobre a assistência à saúde do preso, é correto afirmar que, segundo a LEP:", opts:["tem caráter exclusivamente curativo, dispensando qualquer medida de prevenção","compreende atendimento médico, farmacêutico e odontológico, de caráter preventivo e curativo","limita-se a encaminhamentos externos, sem qualquer estrutura de atendimento interno","é prestada apenas em situações de emergência com risco iminente de morte"], correct:1, exp:"Art. 14, caput, da LEP: assistência preventiva e curativa, com atendimento médico, farmacêutico e odontológico."},
-      {sec:"exec", q:"Quando o estabelecimento penal não estiver aparelhado para prover a assistência médica necessária, a LEP determina que essa assistência:", opts:["deixará de ser prestada até que ocorra a transferência definitiva do preso","será prestada em outro local, mediante autorização da direção do estabelecimento","será substituída por indenização financeira mensal em favor do preso","ficará suspensa até que sobrevenha decisão judicial específica sobre o caso"], correct:1, exp:"Art. 14, §2º, da LEP autoriza o atendimento externo mediante autorização da direção."},
-      {sec:"exec", q:"Segundo a LEP, a assistência jurídica é destinada:", opts:["a todos os presos, independentemente de sua condição financeira ou patrimonial","aos presos e internados sem recursos financeiros para constituir advogado particular","exclusivamente aos presos que cumprem pena em regime fechado","apenas aos presos que ainda não foram sentenciados definitivamente"], correct:1, exp:"Art. 15 da LEP restringe a assistência jurídica estatal a quem não tem recursos para advogado particular."},
-      {sec:"exec", q:"A assistência jurídica integral e gratuita ao preso, no estabelecimento penal, deve ser estruturada, segundo a LEP, por meio de serviços vinculados:", opts:["ao Ministério Público, exclusivamente","à Defensoria Pública","à Ordem dos Advogados do Brasil, obrigatoriamente","a escritórios de advocacia contratados por licitação"], correct:1, exp:"Art. 16 da LEP atribui esse serviço à Defensoria Pública das Unidades da Federação."},
-      {sec:"exec", q:"Sobre a assistência educacional, é correto afirmar que, segundo a LEP:", opts:["compreende apenas cursos de formação profissional, excluída a instrução escolar","compreende a instrução escolar e a formação profissional do preso e do internado","é restrita aos presos que ainda não concluíram o ensino médio","é inteiramente facultativa, inclusive quanto ao ensino fundamental"], correct:1, exp:"Art. 17 da LEP: a assistência educacional abrange tanto a instrução escolar quanto a formação profissional."},
-      {sec:"exec", q:"Quanto ao ensino fundamental no ambiente prisional, a LEP estabelece que ele é:", opts:["facultativo, a critério da direção do estabelecimento","obrigatório, integrando-se ao sistema escolar da Unidade Federativa","opcional, condicionado à disponibilidade orçamentária","restrito a presos com menos de 30 anos de idade"], correct:1, exp:"Art. 18 da LEP torna o ensino fundamental obrigatório, e não facultativo."},
-      {sec:"exec", q:"Segundo a LEP, as atividades educacionais no sistema prisional podem ser objeto de:", opts:["convênio entre a administração pública e entidades públicas ou particulares","apenas execução direta pelo Estado, sem qualquer parceria","contratação exclusiva de professores da rede estadual, sem convênios","proibição de qualquer parceria com entidades privadas"], correct:0, exp:"A LEP admite expressamente convênios com entidades públicas ou particulares para as atividades educacionais."},
-      {sec:"exec", q:"A finalidade da assistência social ao preso e ao internado, segundo a LEP, é:", opts:["fiscalizar exclusivamente o comportamento disciplinar","amparar o preso e o internado e prepará-los para o retorno à liberdade","substituir a atuação do Conselho Penitenciário","limitar-se ao acompanhamento de processos judiciais"], correct:1, exp:"Art. 22 da LEP define essa finalidade dupla: amparo e preparação para a liberdade."},
-      {sec:"exec", q:"Sobre a assistência religiosa, é correto afirmar que a LEP assegura liberdade de culto, mas:", opts:["torna obrigatória a participação em ao menos uma atividade religiosa mensal","veda qualquer manifestação religiosa dentro do estabelecimento","nenhum preso pode ser obrigado a recebê-la","restringe a assistência a uma única confissão religiosa oficial"], correct:2, exp:"Art. 24, §2º, da LEP: a assistência religiosa é livre, e nenhum preso é obrigado a recebê-la."},
-      {sec:"exec", q:"Considera-se egresso, para os fins da assistência prevista na LEP:", opts:["apenas o condenado que já cumpriu integralmente a pena em regime fechado","o liberado definitivo (1 ano da saída) e o liberado condicional (durante o período de prova)","qualquer pessoa que já tenha sido presa alguma vez, sem qualquer limite de tempo fixado","apenas quem obteve indulto presidencial ou comutação judicial da pena imposta"], correct:1, exp:"Arts. 25 e 26 da LEP definem essas duas categorias de egresso, com prazos distintos."},
-      {sec:"exec", q:"Entre as providências da assistência ao egresso previstas na LEP, inclui-se:", opts:["a concessão de auxílio para obtenção de moradia, quando necessário","a garantia de emprego vitalício em órgão público federal ou estadual","a isenção permanente e automática de antecedentes criminais","a doação de imóvel residencial pelo Estado ao egresso"], correct:0, exp:"A LEP prevê auxílio para moradia como parte do apoio à reintegração do egresso, não as demais hipóteses."},
-      {sec:"exec", q:"Assinale a alternativa correta sobre a relação entre assistência material e assistência à saúde, segundo a sistemática da LEP:", opts:["tratam-se exatamente da mesma modalidade de assistência, apenas com nomes diferentes","são modalidades distintas: a material cobre necessidades básicas; a saúde cobre atendimento médico e odontológico","a assistência à saúde abrange e absorve por completo a assistência material do preso","apenas a assistência à saúde possui previsão legal; a material é mera prática administrativa informal"], correct:1, exp:"Arts. 12 e 14 da LEP tratam de modalidades autônomas, com objetos distintos."},
+      {sec:"exec", q:"Segundo a LEP, a assistência ao egresso compreende, entre outras providências:", opts:["orientação e apoio para reintegrar o egresso à vida em liberdade","garantia de emprego público vitalício, independentemente de concurso","isenção automática e permanente de antecedentes criminais","doação obrigatória de imóvel pelo Estado ao egresso"], correct:0, exp:"Arts. 25 e 27 da LEP: a assistência ao egresso foca em orientação e apoio à reintegração, não nas demais hipóteses."},
+      {sec:"exec", q:"Assinale a alternativa INCORRETA sobre a assistência material, segundo a LEP:", opts:["compreende alimentação, vestuário e instalações higiênicas","é uma das seis modalidades previstas no Art. 11","substitui integralmente a necessidade de assistência à saúde","é devida ao preso independentemente de sua situação processual"], correct:2, exp:"Material e saúde são modalidades autônomas — uma não substitui a outra."},
+      {sec:"exec", q:"Considere: I) A assistência jurídica é destinada a quem não tem recursos para constituir advogado. II) A assistência jurídica pode ser prestada por qualquer advogado, mesmo sem vínculo com a Defensoria Pública. Está(ão) correta(s), segundo a LEP:", opts:["apenas a afirmativa I, estando a segunda incorreta quanto ao vínculo institucional","apenas a afirmativa II, estando a primeira incorreta quanto aos destinatários","ambas as afirmativas I e II, por reproduzirem corretamente a LEP","nenhuma das duas afirmativas, por conterem erros quanto à LEP"], correct:0, exp:"A LEP atribui esse serviço especificamente à Defensoria Pública (Art. 16) — a afirmativa II generaliza indevidamente."},
+      {sec:"exec", q:"Sobre a extensão da assistência prevista na LEP, é correto afirmar que ela se destina:", opts:["apenas ao condenado que já iniciou efetivamente o cumprimento da pena","ao preso, ao internado e também, em determinadas hipóteses, ao egresso","exclusivamente aos presos que cumprem pena em regime fechado","apenas aos presos do sexo masculino, segundo a literalidade da LEP"], correct:1, exp:"Art. 10 e seguintes da LEP estendem a assistência ao preso, internado e egresso, sem as demais restrições apontadas."},
+      {sec:"exec", q:"Assinale a alternativa correta sobre o momento em que se inicia a assistência ao egresso, segundo a LEP:", opts:["apenas após o cumprimento integral de toda a pena, sem qualquer antecipação possível","a partir da saída do estabelecimento penal, seja por livramento condicional, seja por liberação definitiva","somente mediante requerimento judicial específico, formulado após 1 ano da soltura","a LEP não prevê, em nenhuma hipótese, assistência voltada ao egresso"], correct:1, exp:"A assistência ao egresso abrange tanto o liberado definitivo quanto o liberado condicional, a partir da saída."},
+      {sec:"exec", q:"Sobre o caráter da assistência educacional, é correto afirmar que, segundo a LEP:", opts:["limita-se exclusivamente à alfabetização de presos ainda analfabetos","compreende tanto a instrução escolar quanto a formação profissional do preso","é vedada a presos que já possuam ensino superior completo","depende de autorização judicial individual para cada preso interessado"], correct:1, exp:"Art. 17 da LEP: a assistência educacional abrange instrução escolar e formação profissional, sem as demais restrições."},
+      {sec:"exec", q:"Segundo a LEP, a assistência à saúde prestada fora do estabelecimento penal, quando este não estiver aparelhado, depende de:", opts:["autorização exclusiva do próprio preso, sem necessidade de qualquer formalidade","autorização da direção do estabelecimento penal","decisão do Ministério Público, em toda e qualquer hipótese legal","prévia licitação pública para a contratação do serviço externo"], correct:1, exp:"Art. 14, §2º, da LEP: a autorização é da direção do estabelecimento, não das demais autoridades apontadas."},
+      {sec:"exec", q:"Assinale a alternativa INCORRETA sobre a assistência social prevista na LEP:", opts:["tem por finalidade amparar o preso e o internado","busca prepará-los para o retorno à liberdade","é modalidade autônoma, distinta da assistência material","substitui, para todos os efeitos, a assistência jurídica"], correct:3, exp:"A assistência social não substitui a jurídica — são modalidades distintas e autônomas entre si."},
+      {sec:"exec", q:"Sobre a assistência religiosa, é correto afirmar que a LEP permite ao preso:", opts:["participar dos serviços organizados no estabelecimento e possuir livros de instrução religiosa","ser obrigado a participar de cultos de uma única religião considerada oficial","ser impedido de qualquer prática religiosa durante o cumprimento da pena","exigir a construção de um templo específico de sua confissão dentro do presídio"], correct:0, exp:"Art. 24 da LEP assegura participação e posse de livros religiosos, sem as demais imposições ou vedações citadas."},
+      {sec:"exec", q:"Considere: I) A assistência material inclui o fornecimento de vestuário ao preso. II) A assistência à saúde inclui atendimento odontológico. Está(ão) correta(s), segundo a LEP:", opts:["apenas a afirmativa I, estando a segunda incorreta quanto ao atendimento odontológico","apenas a afirmativa II, estando a primeira incorreta quanto ao vestuário","ambas as afirmativas I e II, por reproduzirem corretamente a LEP","nenhuma das duas afirmativas, por conterem erros quanto à LEP"], correct:2, exp:"Arts. 12 e 14 da LEP confirmam ambas as afirmativas como corretas."},
+      {sec:"exec", q:"Sobre os destinatários da assistência prevista na LEP, é correto afirmar que:", opts:["alcançam exclusivamente os condenados com sentença já transitada em julgado","alcançam o preso, o internado submetido a medida de segurança, e o egresso","alcançam apenas os presos provisórios, excluídos os já condenados","dependem de comprovação prévia de bom comportamento para serem concedidas"], correct:1, exp:"A assistência da LEP não se condiciona a trânsito em julgado nem a bom comportamento — alcança preso, internado e egresso."},
+      {sec:"exec", q:"Assinale a alternativa correta sobre a relação entre a assistência prevista na LEP e o dever estatal de prevenção ao crime:", opts:["não há qualquer relação entre essas duas questões, segundo a LEP","a assistência é instrumento para prevenir o crime e orientar o retorno à convivência social","a assistência é medida exclusivamente punitiva, sem qualquer função preventiva","a prevenção ao crime é função exclusiva da polícia, e não da assistência penitenciária"], correct:1, exp:"Art. 10 da LEP liga expressamente a assistência à prevenção do crime e à reintegração social."},
+      {sec:"exec", q:"Sobre a assistência jurídica gratuita, segundo a LEP, é correto afirmar que as Unidades da Federação devem organizar esse serviço:", opts:["de forma integral e gratuita, dentro do próprio estabelecimento penal","apenas fora do estabelecimento penal, mediante agendamento prévio obrigatório","exclusivamente por meio de convênios com escritórios de advocacia privados","apenas para presos que já tenham sido condenados de forma definitiva"], correct:0, exp:"Art. 16 da LEP exige a estruturação desse serviço dentro do próprio estabelecimento penal."},
+      {sec:"exec", q:"Um preso deseja participar de cultos de uma religião diferente da maioria dos demais presos do estabelecimento. Segundo a LEP, essa participação:", opts:["deve ser negada, pois o estabelecimento adotaria uma religião oficial única","deve ser permitida, respeitada a liberdade de culto assegurada por lei","depende de aprovação prévia da maioria dos demais presos do estabelecimento","só é permitida a presos que cumprem pena em regime aberto"], correct:1, exp:"A liberdade de culto do Art. 24 da LEP não se condiciona à religião majoritária nem à aprovação de terceiros."},
+      {sec:"exec", q:"Sobre a diferença entre assistência ao preso/internado e assistência ao egresso, é correto afirmar que, segundo a LEP:", opts:["são exatamente a mesma modalidade de assistência, sem qualquer distinção entre elas","a assistência ao egresso ocorre após a saída do estabelecimento, com foco na reintegração social","a assistência ao egresso é expressamente vedada pelo texto da LEP","apenas o egresso liberado condicional recebe assistência; o liberado definitivo, não"], correct:1, exp:"A assistência ao egresso tem foco distinto: reintegração social após a saída, alcançando ambas as categorias de egresso."},
 
-      {sec:"port", q:"As classes de palavras que se flexionam (variam em gênero, número, grau ou pessoa) são denominadas:", opts:["classes invariáveis","classes variáveis","classes conectivas","classes interjectivas"], correct:1, exp:"Substantivo, adjetivo, artigo, numeral, pronome e verbo são as seis classes variáveis da gramática tradicional."},
-      {sec:"port", q:"Assinale a alternativa que reúne exclusivamente classes gramaticais invariáveis:", opts:["substantivo, verbo, artigo e pronome","advérbio, preposição, conjunção e interjeição","adjetivo, numeral, substantivo e verbo","pronome, artigo, adjetivo e advérbio"], correct:1, exp:"As quatro classes invariáveis são exatamente advérbio, preposição, conjunção e interjeição."},
-      {sec:"port", q:"Um substantivo que designa um conjunto de seres da mesma espécie, mesmo estando flexionado no singular, é classificado como:", opts:["substantivo abstrato","substantivo coletivo","substantivo composto","substantivo primitivo"], correct:1, exp:"Substantivo coletivo nomeia um conjunto (ex.: cardume, enxame), independentemente de estar no singular."},
-      {sec:"port", q:"Adjetivos que indicam a nacionalidade, a origem ou o local de procedência de algo ou alguém são chamados de:", opts:["adjetivos pátrios","adjetivos compostos","adjetivos primitivos","adjetivos superlativos"], correct:0, exp:"Adjetivo pátrio é a categoria que expressa nacionalidade/origem (ex.: brasileiro, potiguar)."},
-      {sec:"port", q:"Considere as afirmações: I) Pronomes possessivos indicam posse. II) Pronomes relativos retomam um termo antecedente, introduzindo uma oração subordinada. Está(ão) correta(s):", opts:["apenas I","apenas II","I e II","nenhuma"], correct:2, exp:"Ambas as definições correspondem corretamente às respectivas subclasses de pronomes."},
-      {sec:"port", q:"Verbos que não exigem complemento para ter sentido completo na oração são classificados, quanto à predicação, como:", opts:["transitivos diretos","transitivos indiretos","intransitivos","de ligação"], correct:2, exp:"Verbos intransitivos têm sentido completo por si mesmos, sem exigir objeto direto ou indireto."},
-      {sec:"port", q:"Assinale a alternativa que classifica corretamente as conjunções quanto à sua função sintática:", opts:["coordenativas ligam termos ou orações de mesmo valor sintático; subordinativas ligam uma oração dependente a outra","coordenativas introduzem, sempre e exclusivamente, orações subordinadas de valor adverbial","subordinativas ligam apenas palavras isoladas, nunca orações inteiras entre si","não existe qualquer distinção funcional relevante entre esses dois tipos de conjunção"], correct:0, exp:"Essa é exatamente a distinção funcional entre conjunções coordenativas e subordinativas."},
-      {sec:"port", q:"A palavra \"rapidamente\", em uma frase como \"ele correu rapidamente\", pertence à classe gramatical do(a):", opts:["adjetivo","advérbio","substantivo","pronome"], correct:1, exp:"\"Rapidamente\" modifica o verbo, indicando modo — é advérbio, e não adjetivo."},
-      {sec:"port", q:"Sobre os artigos definidos e indefinidos, é correto afirmar que:", opts:["ambos indicam exatamente o mesmo grau de determinação em relação ao substantivo","o definido indica algo já conhecido ou específico; o indefinido indica algo genérico ou não especificado","apenas o artigo definido é reconhecido como uma classe gramatical autônoma","os artigos indefinidos, ao contrário dos definidos, não variam em gênero e número"], correct:1, exp:"Essa é a distinção semântica clássica entre artigo definido (\"o\", \"a\") e indefinido (\"um\", \"uma\")."},
-      {sec:"port", q:"Numerais que indicam a ordem/posição em uma sequência (ex.: primeiro, segundo) são classificados como numerais:", opts:["cardinais","ordinais","multiplicativos","fracionários"], correct:1, exp:"Numeral ordinal expressa posição em uma sequência; cardinal expressa quantidade."},
-      {sec:"port", q:"A interjeição, entre as classes gramaticais, caracteriza-se por:", opts:["flexionar-se regularmente em gênero e número, à semelhança do substantivo","expressar emoções ou estados afetivos, de forma geralmente isolada na frase","ligar duas orações de mesmo valor sintático dentro de um mesmo período","exercer, dentro da oração, a função sintática de sujeito"], correct:1, exp:"Interjeições (ex.: \"ah!\", \"socorro!\") expressam emoção, sem flexão e sem função sintática integrada à oração."},
-      {sec:"port", q:"Pronomes de tratamento, como \"Vossa Senhoria\" e \"Vossa Excelência\", concordam verbalmente:", opts:["na primeira pessoa do singular, sempre","na segunda pessoa do plural, sempre","na terceira pessoa, ainda que se refiram ao interlocutor","na primeira pessoa do plural, por regra de cortesia"], correct:2, exp:"Embora se refiram ao interlocutor (2ª pessoa do discurso), pronomes de tratamento exigem concordância verbal na 3ª pessoa."},
-      {sec:"port", q:"Assinale a alternativa correta sobre a preposição \"para\" na frase \"Este presente é para você\":", opts:["classifica-se, nessa frase, como conjunção subordinativa integrante","classifica-se como preposição, introduzindo um termo com valor de destinação","classifica-se, nesse contexto, como advérbio indicador de lugar","classifica-se, na frase, como pronome relativo retomando um antecedente"], correct:1, exp:"\"Para\" é preposição, ligando o termo \"você\" ao restante da oração com valor de destinação."},
-      {sec:"port", q:"Sobre a diferença entre substantivo concreto e abstrato, é correto afirmar que:", opts:["concreto nomeia seres de existência própria; abstrato nomeia qualidades, ações ou estados","o substantivo concreto é sempre próprio, e o abstrato é sempre comum, sem exceção","abstrato refere-se exclusivamente a sentimentos; concreto, apenas a objetos físicos visíveis","não existe qualquer distinção formal reconhecida entre essas duas categorias na gramática"], correct:0, exp:"Essa é a definição clássica: concreto tem existência independente da mente que o concebe; abstrato depende dessa concepção (ex.: beleza, coragem)."},
-      {sec:"port", q:"Verbos irregulares, quanto à flexão, caracterizam-se por:", opts:["manterem o radical absolutamente inalterado em todas as conjugações e tempos verbais","sofrerem alterações no radical ou nas desinências que os afastam do padrão regular","não admitirem, em nenhuma hipótese, flexão de modo, tempo ou pessoa","serem, por definição gramatical, sempre classificados como transitivos diretos"], correct:1, exp:"Verbo irregular é aquele cuja flexão se desvia do padrão regular da respectiva conjugação (ex.: \"fazer\", \"ir\")."}
+      {sec:"port", q:"Assinale a alternativa que contém apenas classes gramaticais variáveis:", opts:["substantivo, verbo, preposição e artigo","substantivo, adjetivo, numeral e pronome","advérbio, conjunção, interjeição e verbo","artigo, preposição, conjunção e interjeição"], correct:1, exp:"Substantivo, adjetivo, numeral e pronome flexionam-se — são todas classes variáveis."},
+      {sec:"port", q:"Na frase \"Os alunos estudiosos passaram no concurso\", a palavra \"estudiosos\" classifica-se como:", opts:["advérbio","adjetivo","substantivo","pronome"], correct:1, exp:"\"Estudiosos\" caracteriza o substantivo \"alunos\" — função própria do adjetivo."},
+      {sec:"port", q:"Assinale a alternativa em que a palavra destacada é um substantivo abstrato:", opts:["A mesa da sala está muito limpa.","A justiça deve prevalecer em todos os julgamentos.","O cachorro correu tranquilamente pelo quintal.","O livro permanece sobre a estante antiga."], correct:1, exp:"\"Justiça\" nomeia uma qualidade/conceito abstrato, sem existência física — diferente das demais palavras destacadas, todas concretas."},
+      {sec:"port", q:"Sobre os pronomes demonstrativos, é correto afirmar que eles servem para:", opts:["indicar posse de algo em relação a determinada pessoa","situar um ser ou objeto no espaço, no tempo ou no discurso","substituir exclusivamente nomes próprios de pessoas","ligar duas orações de mesmo valor sintático entre si"], correct:1, exp:"Pronomes demonstrativos (este, esse, aquele) situam algo no espaço/tempo/discurso — não indicam posse nem ligam orações."},
+      {sec:"port", q:"Na frase \"Comprei três livros na feira do centro\", a palavra \"três\" classifica-se como numeral:", opts:["ordinal","cardinal","multiplicativo","fracionário"], correct:1, exp:"\"Três\" indica quantidade exata — numeral cardinal, diferente de ordinal (posição) ou fracionário."},
+      {sec:"port", q:"Assinale a alternativa em que a palavra destacada é uma preposição:", opts:["Ele chegou muito rapidamente ao local de trabalho.","O livro permanece sobre a mesa da sala de estudos.","Ela é sempre muito educada com todos os colegas.","Eles trabalham juntos há muitos anos seguidos."], correct:1, exp:"\"Sobre\", nessa frase, é preposição, ligando \"mesa\" ao restante da oração com valor de lugar."},
+      {sec:"port", q:"Sobre os verbos de ligação, é correto afirmar que eles:", opts:["indicam sempre uma ação praticada pelo sujeito sobre o objeto direto","ligam o sujeito a um predicativo, exprimindo estado, e não propriamente ação","exigem sempre a presença simultânea de dois objetos na mesma oração","só existem, na língua portuguesa, no modo imperativo dos verbos"], correct:1, exp:"Verbos de ligação (ser, estar, parecer, ficar) exprimem estado do sujeito, ligando-o a um predicativo."},
+      {sec:"port", q:"Assinale a alternativa em que a conjunção destacada estabelece relação de causa:", opts:["Estudou muito, portanto foi aprovado no concurso desejado.","Não foi ao trabalho, pois estava se sentindo bastante doente.","Estudou muito, mas ainda assim não foi aprovado.","Estudou muito e também trabalhou bastante ao mesmo tempo."], correct:1, exp:"\"Pois\", nesse contexto, introduz o motivo/causa de não ter ido ao trabalho."},
+      {sec:"port", q:"A palavra \"nós\", em \"Nós estudamos juntos para o concurso\", classifica-se como pronome:", opts:["possessivo","pessoal","demonstrativo","indefinido"], correct:1, exp:"\"Nós\" é pronome pessoal, representando a primeira pessoa do plural do discurso."},
+      {sec:"port", q:"Sobre os artigos, é correto afirmar que eles antecedem o substantivo para:", opts:["indicar sempre uma quantidade exata dos elementos referidos por ele","determinar o substantivo como algo já conhecido (definido) ou não (indefinido)","substituir por completo o substantivo dentro da estrutura da frase","exercer função exclusiva de ligação entre duas orações distintas entre si"], correct:1, exp:"Essa é a função semântica central dos artigos — determinar o grau de conhecimento sobre o substantivo."},
+      {sec:"port", q:"Assinale a alternativa em que a palavra destacada é uma interjeição:", opts:["Que belo dia para se dedicar aos estudos!","Socorro! Preciso de ajuda com urgência agora.","O concurso será realizado no mês de setembro.","Estudar todos os dias é algo fundamental."], correct:1, exp:"\"Socorro!\" expressa emoção/apelo de forma isolada — característica típica da interjeição."},
+      {sec:"port", q:"Na frase \"Ele trabalha rápido e com muita eficiência\", a palavra \"rápido\" modifica o verbo e classifica-se como:", opts:["adjetivo","advérbio","substantivo","pronome"], correct:1, exp:"Ao modificar o verbo \"trabalha\", indicando modo, \"rápido\" funciona como advérbio nessa frase."},
+      {sec:"port", q:"Sobre os pronomes indefinidos, é correto afirmar que eles se referem a seres ou quantidades:", opts:["de forma precisa e completamente determinada","de modo vago ou impreciso, sem qualquer indicação exata","exclusivamente no plural, nunca flexionados no singular","apenas dentro de frases de natureza interrogativa"], correct:1, exp:"Pronomes indefinidos (algum, nenhum, todo, qualquer) referem-se de modo vago, sem precisão."},
+      {sec:"port", q:"Assinale a alternativa em que a palavra destacada é um substantivo coletivo:", opts:["O professor chegou atrasado à sala de aula hoje.","A alcateia se aproximou lentamente da presa escolhida.","O livro permanecia sobre a mesa da biblioteca.","A caneta azul está sobre o caderno novo."], correct:1, exp:"\"Alcateia\" designa um conjunto de lobos, mesmo estando no singular — substantivo coletivo."},
+      {sec:"port", q:"Sobre a classe gramatical do verbo, é correto afirmar que ele exprime, entre outras possibilidades:", opts:["exclusivamente estados permanentes, nunca ações do sujeito","ação, estado, fenômeno da natureza ou mudança de estado","apenas ações físicas visíveis a olho nu, sem exceção","unicamente ordens dadas no modo imperativo da língua"], correct:1, exp:"O verbo é a classe mais versátil: pode exprimir ação, estado, fenômeno da natureza ou mudança de estado."}
     ]
   },
   5: {
@@ -1491,6 +1492,7 @@ let activeDay = null;
 let activeQuestions = [];
 let score = 0;
 let answered = [];
+let escolhas = [];
 
 function loadDay(day){
   activeDay = day;
@@ -1503,10 +1505,17 @@ function loadDay(day){
 
   const jaRespondeu = currentStudent && buscarResultadoLocal('dia', day, currentStudent);
   if(jaRespondeu){
-    activeQuestions = []; answered = []; score = jaRespondeu.acertos;
+    activeQuestions = []; answered = []; escolhas = []; score = jaRespondeu.acertos;
     document.getElementById('progressFill').style.width = '100%';
-    document.getElementById('quizArea').innerHTML = '<div class="card"><h2>Você já respondeu este questionário</h2>'
-      + '<p class="hint">Cada questionário só pode ser feito uma vez — o resultado abaixo já está contabilizado.</p></div>';
+    const area = document.getElementById('quizArea');
+    area.innerHTML = '';
+    const aviso = document.createElement('div');
+    aviso.className = 'card';
+    aviso.innerHTML = '<h2>Você já respondeu este questionário</h2><p class="hint">Cada questionário só pode ser feito uma vez. Veja abaixo a revisão de todas as questões, com a alternativa que você marcou.</p>';
+    area.appendChild(aviso);
+    if(jaRespondeu.respostas && jaRespondeu.respostas.length){
+      renderRevisaoEstatica(area, jaRespondeu.respostas);
+    }
     document.getElementById('resultCard').classList.add('show');
     document.getElementById('scoreText').textContent = jaRespondeu.acertos + '/' + jaRespondeu.total;
     document.getElementById('scoreDetail').textContent = Math.round(jaRespondeu.acertos/jaRespondeu.total*100) + '% de acerto — sem nova tentativa disponível.';
@@ -1516,8 +1525,51 @@ function loadDay(day){
   activeQuestions = shuffleQuestions(shuffleWithinGroups(data.questions));
   score = 0;
   answered = new Array(activeQuestions.length).fill(false);
+  escolhas = new Array(activeQuestions.length).fill(null);
   renderQuiz();
   updateProgress();
+}
+
+/* Mostra a revisão completa e somente leitura de uma tentativa já feita
+   (usada tanto pro questionário diário quanto pro simulado). "respostas"
+   é um array de {sec, q, opts, correct, escolhida, exp}. */
+function renderRevisaoEstatica(container, respostas){
+  let lastSec = null;
+  respostas.forEach((item, idx) => {
+    if(item.sec !== lastSec){
+      const lbl = document.createElement('div');
+      lbl.className = 'section-label';
+      lbl.textContent = secLabel(item.sec);
+      container.appendChild(lbl);
+      lastSec = item.sec;
+    }
+    const card = document.createElement('div');
+    card.className = 'qcard';
+    const num = document.createElement('div');
+    num.className = 'qnum';
+    num.textContent = 'QUESTÃO ' + (idx+1) + '/' + respostas.length;
+    card.appendChild(num);
+    const qtext = document.createElement('p');
+    qtext.className = 'qtext';
+    qtext.textContent = item.q;
+    card.appendChild(qtext);
+    const letters = ['A','B','C','D'];
+    (item.opts || []).forEach((opt, oi) => {
+      const row = document.createElement('div');
+      row.className = 'opt disabled';
+      if(oi === item.correct) row.classList.add('correct');
+      if(oi === item.escolhida && item.escolhida !== item.correct) row.classList.add('wrong');
+      if(oi !== item.correct && oi !== item.escolhida) row.classList.add('dim');
+      row.innerHTML = '<span class="letter">'+letters[oi]+'</span><span class="otext">'+opt+'</span>';
+      card.appendChild(row);
+    });
+    const fb = document.createElement('div');
+    const acertou = item.escolhida === item.correct;
+    fb.className = 'feedback show ' + (acertou ? 'ok' : 'no');
+    fb.innerHTML = (acertou ? '<b>Você acertou.</b> ' : '<b>Você errou.</b> A alternativa certa é a ' + letters[item.correct] + '. ') + item.exp;
+    card.appendChild(fb);
+    container.appendChild(card);
+  });
 }
 
 function renderQuiz(){
@@ -1562,6 +1614,7 @@ function renderQuiz(){
 function selectAnswer(qIdx, oIdx, row, card){
   if(answered[qIdx]) return;
   answered[qIdx] = true;
+  escolhas[qIdx] = oIdx;
   const item = activeQuestions[qIdx];
   const opts = card.querySelectorAll('.opt');
   opts.forEach((o, i) => {
@@ -1604,7 +1657,10 @@ async function finishQuiz(){
   card.scrollIntoView({behavior:'smooth', block:'center'});
 
   if(currentStudent){
-    await saveQuizResult(currentStudent, activeDay, score, total);
+    const respostas = activeQuestions.map((item, i) => ({
+      sec: item.sec, q: item.q, opts: item.opts, correct: item.correct, escolhida: escolhas[i], exp: item.exp
+    }));
+    await saveQuizResult(currentStudent, activeDay, score, total, respostas);
     await ganharPontosDiarios(currentStudent, score);
     if(dateStr) await aplicarMultaJanelaSeNecessario('dia', dateStr, currentStudent);
   }
@@ -1613,8 +1669,8 @@ async function finishQuiz(){
 /* =========================================================
    RESULTADOS DE QUESTIONÁRIO (compartilhado, por aluno/dia)
    ========================================================= */
-async function saveQuizResult(nome, day, score, total){
-  await salvarResultado('dia', day, nome, score, total);
+async function saveQuizResult(nome, day, score, total, respostas){
+  await salvarResultado('dia', day, nome, score, total, null, respostas);
 }
 
 /* =========================================================
@@ -1712,8 +1768,8 @@ async function loadAll(){
   renderAll();
 }
 
-async function saveSimuladoResult(nome, data, acertos, tempoMin){
-  await salvarResultado('sim', data, nome, acertos, 50, tempoMin);
+async function saveSimuladoResult(nome, data, acertos, tempoMin, respostas){
+  await salvarResultado('sim', data, nome, acertos, 50, tempoMin, respostas);
 }
 
 function renderSimuladoTable(){
@@ -1784,6 +1840,7 @@ let simInterval = null;
 let simQuestions = [];
 let simScore = 0;
 let simAnswered = [];
+let simEscolhas = [];
 let simSelectedDate = null;
 let simChosenDate = null;
 let simRunning = false;
@@ -1807,8 +1864,15 @@ function abrirSimulado(date){
   const jaFez = currentStudent && buscarResultadoLocal('sim', date, currentStudent);
   if(jaFez){
     document.getElementById('simSetupArea').style.display = 'none';
-    document.getElementById('simQuizArea').innerHTML = '<div class="card"><h2>Você já fez este simulado</h2>'
-      + '<p class="hint">Cada simulado só pode ser feito uma vez — o resultado abaixo já está contabilizado.</p></div>';
+    const area = document.getElementById('simQuizArea');
+    area.innerHTML = '';
+    const aviso = document.createElement('div');
+    aviso.className = 'card';
+    aviso.innerHTML = '<h2>Você já fez este simulado</h2><p class="hint">Cada simulado só pode ser feito uma vez. Veja abaixo a revisão de todas as questões, com a alternativa que você marcou.</p>';
+    area.appendChild(aviso);
+    if(jaFez.respostas && jaFez.respostas.length){
+      renderRevisaoEstatica(area, jaFez.respostas);
+    }
     document.getElementById('simResultCard').classList.add('show');
     const total = data ? data.questions.length : 50;
     document.getElementById('simScoreText').textContent = jaFez.acertos + '/' + total;
@@ -1828,6 +1892,7 @@ function iniciarSimulado(){
   simQuestions = shuffleQuestions(shuffleWithinGroups(data.questions));
   simScore = 0;
   simAnswered = new Array(simQuestions.length).fill(false);
+  simEscolhas = new Array(simQuestions.length).fill(null);
   simSeconds = 150*60;
   simRunning = true;
 
@@ -1897,6 +1962,7 @@ function renderSimQuiz(){
 function selectSimAnswer(qIdx, oIdx, row, card){
   if(simAnswered[qIdx] || !simRunning) return;
   simAnswered[qIdx] = true;
+  simEscolhas[qIdx] = oIdx;
   const item = simQuestions[qIdx];
   const opts = card.querySelectorAll('.opt');
   opts.forEach((o, i) => {
@@ -1937,7 +2003,10 @@ async function finalizarSimulado(){
   card.scrollIntoView({behavior:'smooth', block:'center'});
 
   if(currentStudent && simSelectedDate){
-    await saveSimuladoResult(currentStudent, simSelectedDate, simScore, elapsedMin);
+    const respostas = simQuestions.map((item, i) => ({
+      sec: item.sec, q: item.q, opts: item.opts, correct: item.correct, escolhida: simEscolhas[i], exp: item.exp
+    }));
+    await saveSimuladoResult(currentStudent, simSelectedDate, simScore, elapsedMin, respostas);
     renderSimuladoTable();
     await ganharPontosSimulados(currentStudent, simScore);
     await aplicarMultaJanelaSeNecessario('sim', simSelectedDate, currentStudent);
