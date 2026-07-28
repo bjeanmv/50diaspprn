@@ -61,9 +61,6 @@
   .pill.no{background:var(--danger-dim);color:var(--danger);}
   .pos{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent);}
   .pos.gold{color:#F2CB4E;}
-  .checkin-grid{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
-  .checkin-item{display:flex;align-items:center;justify-content:space-between;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:9px 12px;}
-  .checkin-item .name{font-weight:600;}
   .toggle-btns{display:flex;gap:6px;}
   .toggle-btns button{padding:6px 12px;font-size:12.5px;}
   .footer-note{color:var(--muted);font-size:12px;text-align:center;margin-top:24px;line-height:1.6;}
@@ -160,7 +157,7 @@
 
     <div class="card">
       <h2>Painel de multas do grupo</h2>
-      <p class="hint">Cada dia furado marcado no check-in soma +1 na coluna <code>dias_furados</code> do Supabase. Multa fixa: R$ 1,00 por dia furado.</p>
+      <p class="hint">Cada questionário diário ou simulado não feito até às 03h do prazo soma +1 na coluna <code>dias_furados</code> do Supabase (verificado automaticamente). Multa fixa: R$ 1,00 por ocorrência.</p>
       <table>
         <thead>
           <tr><th>Integrante</th><th>Dias furados</th><th>Multa total</th></tr>
@@ -170,24 +167,6 @@
       <div style="margin-top:16px;text-align:right;">
         <span class="sub" style="display:block;">Total acumulado pelo grupo</span>
         <span class="total-multa" id="totalMultaGrupo">R$ 0,00</span>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Check-in diário (estudou os 2 tópicos do dia?)</h2>
-      <div id="checkinGate" class="gate" style="display:none;">
-        <p>Selecione seu nome no topo da página para registrar seu check-in.</p>
-      </div>
-      <div id="checkinFormArea">
-        <p class="hint">Registrando para: <b id="checkinQuemLabel">—</b>. Selecione a data do cronograma e marque se estudou. Marcar "Não estudei" soma +1 em <code>dias_furados</code> no Supabase (uma única vez por dia).</p>
-        <div class="row" style="max-width:260px;">
-          <div class="field">
-            <label class="field-label" for="checkinData">Data</label>
-            <input id="checkinData" type="date" min="2026-07-24" max="2026-09-11">
-          </div>
-          <button class="btn-ghost" onclick="loadCheckinDay()">Carregar</button>
-        </div>
-        <div id="checkinArea" class="checkin-grid"></div>
       </div>
     </div>
 
@@ -811,23 +790,19 @@ const SIMULADOS = {
 };
 
 /* =========================================================
-   JANELA DO DESAFIO — cada dia/simulado fica "aberto" das 18h
-   do dia vigente até as 03h do dia seguinte. Responder fora
-   dessa janela não bloqueia, mas gera multa (dias_furados).
+   PRAZO DO DESAFIO — cada dia/simulado pode ser feito em qualquer
+   horário até às 03h do dia seguinte à sua data. Não há restrição
+   de horário mínimo. Depois das 03h, o prazo vence e conta multa
+   (dias_furados) — tanto se for feito atrasado quanto se nunca for feito.
    ========================================================= */
-function getJanela(dateStr){
+function getPrazoFinal(dateStr){
   const [y, m, d] = dateStr.split('-').map(Number);
-  const abre = new Date(y, m - 1, d, 18, 0, 0);
-  const fecha = new Date(y, m - 1, d, 27, 0, 0); // 27h = 03h do dia seguinte
-  return { abre, fecha };
+  return new Date(y, m - 1, d + 1, 3, 0, 0); // 03h do dia seguinte
 }
 function statusJanela(dateStr){
   if(!dateStr) return { estado: 'sem-data' };
-  const { abre, fecha } = getJanela(dateStr);
-  const agora = new Date();
-  if(agora < abre) return { estado: 'ainda-nao-abriu', abre, fecha };
-  if(agora > fecha) return { estado: 'encerrada', abre, fecha };
-  return { estado: 'aberta', abre, fecha };
+  const fecha = getPrazoFinal(dateStr);
+  return { estado: (new Date() > fecha ? 'encerrada' : 'aberta'), fecha };
 }
 function fmtHora(dt){
   return String(dt.getHours()).padStart(2,'0') + 'h' + (dt.getMinutes() ? String(dt.getMinutes()).padStart(2,'0') : '');
@@ -838,12 +813,11 @@ function fmtDataCurta(dt){
 function descricaoJanela(dateStr){
   const s = statusJanela(dateStr);
   if(s.estado === 'sem-data') return '';
-  if(s.estado === 'ainda-nao-abriu') return `Abre às ${fmtHora(s.abre)} de ${fmtDataCurta(s.abre)}`;
-  if(s.estado === 'aberta') return `Aberto até ${fmtHora(s.fecha)} de ${fmtDataCurta(s.fecha)}`;
-  return `Encerrado desde ${fmtHora(s.fecha)} de ${fmtDataCurta(s.fecha)} — respondendo agora conta multa`;
+  if(s.estado === 'aberta') return `Prazo até ${fmtHora(s.fecha)} de ${fmtDataCurta(s.fecha)}`;
+  return `Prazo encerrado às ${fmtHora(s.fecha)} de ${fmtDataCurta(s.fecha)} — se não foi feito, conta multa`;
 }
 
-/* Aplica multa (dias_furados) quando o aluno responde fora da janela — no máximo
+/* Aplica multa (dias_furados) quando o prazo já venceu — no máximo
    uma vez por aluno/dia/simulado, controlado localmente em state.janelaMultas. */
 async function aplicarMultaJanelaSeNecessario(tipo, dateStr, nome){
   if(!nome || !dateStr) return;
@@ -857,6 +831,28 @@ async function aplicarMultaJanelaSeNecessario(tipo, dateStr, nome){
   try{ await window.storage.set('janelaMultas', JSON.stringify(state.janelaMultas), true); }
   catch(e){ console.error(e); }
   await ajustarDiasFurados(nome, +1);
+}
+
+/* Verifica, para todo dia/simulado cujo prazo já venceu, quem nunca completou —
+   e aplica a multa retroativa (uma única vez por aluno/dia, via janelaMultas). */
+async function verificarMultasPendentes(){
+  if(!MEMBERS || MEMBERS.length === 0) return;
+  for(const day of Object.keys(QUIZZES)){
+    const dateStr = QUIZZES[day].date;
+    if(!dateStr || statusJanela(dateStr).estado !== 'encerrada') continue;
+    for(const nome of MEMBERS){
+      const feito = quizResults[nome] && quizResults[nome][day];
+      if(!feito) await aplicarMultaJanelaSeNecessario('dia', dateStr, nome);
+    }
+  }
+  for(const dateStr of Object.keys(SIMULADOS)){
+    if(statusJanela(dateStr).estado !== 'encerrada') continue;
+    for(const nome of MEMBERS){
+      const feito = state.simulados[dateStr] && state.simulados[dateStr][nome];
+      if(!feito) await aplicarMultaJanelaSeNecessario('sim', dateStr, nome);
+    }
+  }
+  renderMultaTable();
 }
 
 function secLabel(sec){
@@ -929,12 +925,6 @@ async function onStudentChange(){
 
 function updateGates(){
   const has = !!currentStudent;
-  const cg = document.getElementById('checkinGate');
-  const cf = document.getElementById('checkinFormArea');
-  if(cg){ cg.style.display = has ? 'none' : ''; }
-  if(cf){ cf.style.display = has ? '' : 'none'; }
-  const cql = document.getElementById('checkinQuemLabel');
-  if(cql) cql.textContent = currentStudent || '—';
   const sg = document.getElementById('simGate');
   const ss = document.getElementById('simSetupArea');
   if(sg){ sg.style.display = has ? 'none' : ''; }
@@ -1151,7 +1141,7 @@ async function finishQuiz(){
   else msg = 'Vale revisar a teoria deste dia antes de seguir para o próximo tópico.';
   const dateStr = QUIZZES[activeDay] && QUIZZES[activeDay].date;
   const foraDaJanela = dateStr && statusJanela(dateStr).estado !== 'aberta';
-  if(foraDaJanela) msg += ' Atenção: respondido fora da janela do desafio (18h–03h) — multa de R$ 1,00 aplicada.';
+  if(foraDaJanela) msg += ' Atenção: respondido após o prazo (03h) — multa de R$ 1,00 aplicada.';
   document.getElementById('scoreDetail').textContent = pct + '% de acerto — ' + msg;
   card.scrollIntoView({behavior:'smooth', block:'center'});
 
@@ -1186,7 +1176,7 @@ async function saveQuizResult(nome, day, score, total){
    PAINEL DE SIMULADOS (compartilhado)
    ========================================================= */
 const SUNDAYS = ["2026-07-26","2026-08-02","2026-08-09","2026-08-16","2026-08-23","2026-08-30","2026-09-06"];
-let state = { simulados: {}, checkins: {}, janelaMultas: {} };
+let state = { simulados: {}, janelaMultas: {} };
 
 function fmtDate(iso){
   const [y,m,d] = iso.split("-");
@@ -1195,7 +1185,6 @@ function fmtDate(iso){
 
 async function loadAll(){
   try{ const r = await window.storage.get('simulados', true); state.simulados = r ? JSON.parse(r.value) : {}; }catch(e){ state.simulados = {}; }
-  try{ const r = await window.storage.get('checkins', true); state.checkins = r ? JSON.parse(r.value) : {}; }catch(e){ state.checkins = {}; }
   try{ const r = await window.storage.get('janelaMultas', true); state.janelaMultas = r ? JSON.parse(r.value) : {}; }catch(e){ state.janelaMultas = {}; }
   await loadQuizResults();
   renderAll();
@@ -1204,10 +1193,6 @@ async function loadAll(){
 async function saveSimulados(){
   try{ await window.storage.set('simulados', JSON.stringify(state.simulados), true); }
   catch(e){ console.error(e); mostrarErroSupabase('Falha ao salvar simulados localmente: ' + e.message); }
-}
-async function saveCheckins(){
-  try{ await window.storage.set('checkins', JSON.stringify(state.checkins), true); }
-  catch(e){ console.error(e); mostrarErroSupabase('Falha ao salvar checkins localmente: ' + e.message); }
 }
 
 async function saveSimuladoResult(nome, data, acertos, tempoMin){
@@ -1240,45 +1225,6 @@ function renderSimuladoTable(){
   </tbody></table>`;
 }
 
-function loadCheckinDay(){
-  const data = document.getElementById('checkinData').value;
-  if(!data) return;
-  renderCheckinArea(data);
-}
-
-function renderCheckinArea(data){
-  const el = document.getElementById('checkinArea');
-  if(!data){ el.innerHTML = '<div class="empty">Escolha uma data para registrar o check-in.</div>'; return; }
-  if(!currentStudent){ el.innerHTML = '<div class="empty">Selecione seu nome no topo da página.</div>'; return; }
-  const dayData = state.checkins[data] || {};
-  const status = dayData[currentStudent];
-  el.innerHTML = `<div class="checkin-item">
-      <span class="name">${currentStudent}</span>
-      <div class="toggle-btns">
-        <button class="${status===true ? 'btn-accent' : 'btn-ghost'}" onclick="setCheckin('${data}','${currentStudent}', true)">Estudei</button>
-        <button class="${status===false ? 'btn-accent' : 'btn-ghost'}" onclick="setCheckin('${data}','${currentStudent}', false)">Não estudei</button>
-      </div>
-    </div>`;
-}
-
-async function setCheckin(data, membro, valor){
-  const anterior = (state.checkins[data] || {})[membro];
-  if(!state.checkins[data]) state.checkins[data] = {};
-  state.checkins[data][membro] = valor;
-  await saveCheckins();
-  renderCheckinArea(data);
-
-  // dias_furados no Supabase só é ajustado quando o status realmente muda,
-  // para não contar o mesmo dia mais de uma vez.
-  if(anterior !== false && valor === false){
-    await ajustarDiasFurados(membro, +1);   // passou a ser "furado"
-  } else if(anterior === false && valor === true){
-    await ajustarDiasFurados(membro, -1);   // corrigiu para "estudei"
-  } else {
-    renderMultaTable();
-  }
-}
-
 function renderMultaTable(){
   const el = document.getElementById('multaTable');
   if(rankingGeral.length === 0){
@@ -1303,8 +1249,6 @@ function renderMultaTable(){
 function renderAll(){
   renderMultaTable();
   updateGates();
-  const data = document.getElementById('checkinData').value;
-  if(data) renderCheckinArea(data);
 }
 
 /* ---- Aba Simulados: cronômetro fixo + questionário de 50 questões ---- */
@@ -1457,7 +1401,7 @@ async function finalizarSimulado(){
   const pct = Math.round(simScore/total*100);
   let detalhe = pct + '% de acerto — tempo utilizado: ' + elapsedMin + ' min.';
   const foraDaJanela = simSelectedDate && statusJanela(simSelectedDate).estado !== 'aberta';
-  if(foraDaJanela) detalhe += ' Atenção: respondido fora da janela do desafio (18h–03h) — multa de R$ 1,00 aplicada.';
+  if(foraDaJanela) detalhe += ' Atenção: respondido após o prazo (03h) — multa de R$ 1,00 aplicada.';
   document.getElementById('simScoreDetail').textContent = detalhe;
   card.scrollIntoView({behavior:'smooth', block:'center'});
 
@@ -1475,6 +1419,7 @@ async function init(){
   try{ await loadStudent(); }catch(e){ console.error(e); }
   try{ await loadAll(); }catch(e){ console.error(e); }
   renderRankingGeral();
+  try{ await verificarMultasPendentes(); }catch(e){ console.error(e); }
 }
 init();
 </script>
