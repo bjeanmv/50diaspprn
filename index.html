@@ -418,6 +418,18 @@ async function ajustarDiasFurados(nome, delta){
   renderMultaTable();
 }
 
+/* Igual a ajustarDiasFurados, mas sem re-buscar o ranking inteiro a cada chamada —
+   usada quando várias multas são aplicadas em lote (evita muitas requisições em sequência). */
+async function ajustarDiasFuradosLote(nome, delta){
+  if(!nome || !delta) return;
+  if(!supabaseClient){ mostrarErroSupabase('Sem conexão com o banco agora — a multa não foi salva.'); return; }
+  const atual = rankingGeral.find(r => r.nome === nome);
+  const novoTotal = Math.max(0, (atual ? atual.dias_furados : 0) + delta);
+  const { error } = await supabaseClient.from('ranking_concurso').upsert({ nome: nome, dias_furados: novoTotal }, { onConflict: 'nome' });
+  if(error){ console.error(error); mostrarErroSupabase('Não foi possível salvar a multa de "' + nome + '": ' + error.message); return; }
+  if(atual) atual.dias_furados = novoTotal;
+}
+
 function renderRankingGeral(){
   const tPrincipal = document.getElementById('rankingPrincipalTable');
   const tDiario = document.getElementById('rankingDiarioTable');
@@ -1136,24 +1148,58 @@ async function aplicarMultaJanelaSeNecessario(tipo, dateStr, nome){
 }
 
 /* Verifica, para todo dia/simulado cujo prazo já venceu (a partir do Dia 3), quem
-   nunca completou — e aplica a multa retroativa (uma única vez por aluno/dia). */
+   nunca completou — e aplica a multa retroativa. Todas as marcações pendentes são
+   salvas em UMA ÚNICA gravação (em vez de uma gravação por aluno/dia), evitando
+   disparar muitas requisições em sequência rápida. */
 async function verificarMultasPendentes(){
   if(!MEMBERS || MEMBERS.length === 0) return;
+  if(!state.janelaMultas) state.janelaMultas = {};
+
+  const pendentes = [];
   for(const day of Object.keys(QUIZZES)){
     const dateStr = QUIZZES[day].date;
     if(!dateStr || dateStr < MULTA_A_PARTIR_DE || statusJanela(dateStr).estado !== 'encerrada') continue;
     for(const nome of MEMBERS){
+      if(state.janelaMultas['dia:'+dateStr] && state.janelaMultas['dia:'+dateStr][nome]) continue;
       const feito = quizResults[nome] && quizResults[nome][day];
-      if(!feito) await aplicarMultaJanelaSeNecessario('dia', dateStr, nome);
+      if(!feito) pendentes.push({ tipo: 'dia', dateStr, nome });
     }
   }
   for(const dateStr of Object.keys(SIMULADOS)){
     if(dateStr < MULTA_A_PARTIR_DE || statusJanela(dateStr).estado !== 'encerrada') continue;
     for(const nome of MEMBERS){
+      if(state.janelaMultas['sim:'+dateStr] && state.janelaMultas['sim:'+dateStr][nome]) continue;
       const feito = state.simulados[dateStr] && state.simulados[dateStr][nome];
-      if(!feito) await aplicarMultaJanelaSeNecessario('sim', dateStr, nome);
+      if(!feito) pendentes.push({ tipo: 'sim', dateStr, nome });
     }
   }
+
+  if(pendentes.length === 0) return;
+
+  // Marca todas em memória primeiro...
+  const backup = JSON.parse(JSON.stringify(state.janelaMultas));
+  pendentes.forEach(p => {
+    const key = p.tipo + ':' + p.dateStr;
+    if(!state.janelaMultas[key]) state.janelaMultas[key] = {};
+    state.janelaMultas[key][p.nome] = true;
+  });
+
+  // ...e grava tudo de uma vez só.
+  try{
+    await window.storage.set('janelaMultas', JSON.stringify(state.janelaMultas), true);
+  } catch(e) {
+    console.error(e);
+    state.janelaMultas = backup; // não persistiu — desfaz tudo, não aplica nenhuma multa agora
+    mostrarErroSupabase('Não foi possível registrar as marcações de multas pendentes agora. Serão tentadas novamente mais tarde, sem cobrar em duplicidade.');
+    return;
+  }
+
+  // Persistência local OK — agora aplica cada multa no banco (sem re-buscar o ranking a cada uma).
+  for(const p of pendentes){
+    await ajustarDiasFuradosLote(p.nome, +1);
+  }
+  await fetchRankingGeral();
+  renderRankingGeral();
   renderMultaTable();
 }
 
