@@ -147,7 +147,12 @@
   <div id="supabaseStatus" class="gate" style="display:none;text-align:left;border-color:var(--danger);"></div>
 
   <!-- ======================= HOMEPAGE ======================= -->
-  <div id="view-painel">
+  <div id="appGate" class="gate" style="display:none; max-width:520px; margin:40px auto; text-align:center;">
+    <h2 style="color:var(--accent); margin-top:0; font-family:'Oswald',sans-serif; text-transform:uppercase;">Bem-vindo(a) ao Foco na Missão</h2>
+    <p>Selecione seu nome no campo "Aluno", no topo da página, para acessar o painel, o estudo diário, os simulados e o seu caderno de erros.</p>
+  </div>
+
+  <div id="view-painel" style="display:none;">
 
     <div class="shared-note">
       Este painel é compartilhado: tudo que qualquer pessoa do grupo registrar aqui fica visível para todos que abrirem este link.
@@ -937,7 +942,12 @@ async function onStudentChange(){
     if(currentStudent) await window.storage.set('meuNome', currentStudent, false);
   }catch(e){}
   updateGates();
-  renderAll();
+  if(currentStudent){
+    const sel = document.getElementById('viewSelect').value;
+    goToView(sel && sel !== 'painel' ? sel : 'painel');
+  } else {
+    goToView('painel');
+  }
 }
 
 function updateGates(){
@@ -965,7 +975,7 @@ function buildNav(){
 }
 
 function hideAllViews(){
-  ['view-painel','view-ranking-geral','view-simulado','view-quiz','view-lista-dias','view-lista-simulados','view-caderno-erros'].forEach(id => {
+  ['view-painel','view-ranking-geral','view-simulado','view-quiz','view-lista-dias','view-lista-simulados','view-caderno-erros','appGate'].forEach(id => {
     document.getElementById(id).style.display = 'none';
   });
 }
@@ -973,6 +983,12 @@ function hideAllViews(){
 function goToView(view){
   document.getElementById('viewSelect').value = (view === 'quiz' || view === 'simulado') ? document.getElementById('viewSelect').value : view;
   hideAllViews();
+  if(!currentStudent){
+    document.getElementById('appGate').style.display = '';
+    document.getElementById('pageTitle').textContent = 'Foco na Missão';
+    document.getElementById('pageSub').textContent = 'Selecione seu nome no topo da página para continuar';
+    return;
+  }
   if(view === 'painel'){
     document.getElementById('view-painel').style.display = '';
     document.getElementById('pageTitle').textContent = 'Painel do Grupo — Desafio 50 Dias PPRN';
@@ -1006,23 +1022,45 @@ function onViewChange(){
   goToView(document.getElementById('viewSelect').value);
 }
 
+function hojeISO(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
 function popularListaDias(){
   const el = document.getElementById('listaDiasButtons');
   const dias = Object.keys(QUIZZES).sort((a,b)=>a-b);
   if(dias.length === 0){ el.innerHTML = '<div class="empty">Nenhum dia disponível ainda.</div>'; return; }
+  const hoje = hojeISO();
   el.innerHTML = dias.map(day => {
     const data = QUIZZES[day];
+    const bloqueado = data.date && hoje < data.date;
+    const jaRespondeu = currentStudent && quizResults[currentStudent] && quizResults[currentStudent][day];
+
+    if(bloqueado){
+      return `<div style="display:flex;flex-direction:column;gap:3px;">
+        <button disabled style="opacity:.45;cursor:default;">${data.label}</button>
+        <span style="font-size:10.5px;color:var(--muted);text-align:center;">Ainda não chegou — abre em ${fmtDataCurta(new Date(data.date+'T00:00:00'))}</span>
+      </div>`;
+    }
+
     const st = data.date ? statusJanela(data.date) : null;
-    const cor = st ? (st.estado === 'aberta' ? 'var(--success)' : (st.estado === 'encerrada' ? 'var(--danger)' : 'var(--muted)')) : 'var(--muted)';
+    const cor = st ? (st.estado === 'aberta' ? 'var(--success)' : 'var(--danger)') : 'var(--muted)';
     const desc = data.date ? descricaoJanela(data.date) : '';
     return `<div style="display:flex;flex-direction:column;gap:3px;">
-      <button onclick="abrirDia('${day}')">${data.label}</button>
-      ${desc ? `<span style="font-size:10.5px;color:${cor};text-align:center;">${desc}</span>` : ''}
+      <button onclick="abrirDia('${day}')">${data.label}${jaRespondeu ? ' ✓' : ''}</button>
+      ${desc ? `<span style="font-size:10.5px;color:${cor};text-align:center;">${desc}${jaRespondeu ? ' · já respondido' : ''}</span>` : ''}
     </div>`;
   }).join('');
 }
 
 function abrirDia(day){
+  if(!currentStudent){ goToView('lista-dias'); return; }
+  const data = QUIZZES[day];
+  if(data.date && hojeISO() < data.date){
+    alert('Este dia ainda não abriu. Ele fica disponível a partir de ' + fmtDataCurta(new Date(data.date+'T00:00:00')) + '.');
+    return;
+  }
   hideAllViews();
   document.getElementById('view-quiz').style.display = '';
   document.getElementById('pageTitle').textContent = 'Dia ' + day + ' — ' + QUIZZES[day].label.split('—')[1].trim();
@@ -1040,11 +1078,12 @@ function popularListaSimulados(){
       return `<button disabled style="opacity:.45;cursor:default;">${label}</button>`;
     }
     const st = statusJanela(d);
-    const cor = st.estado === 'aberta' ? 'var(--success)' : (st.estado === 'encerrada' ? 'var(--danger)' : 'var(--muted)');
+    const cor = st.estado === 'aberta' ? 'var(--success)' : 'var(--danger)';
     const desc = descricaoJanela(d);
+    const jaFez = currentStudent && state.simulados[d] && state.simulados[d][currentStudent];
     return `<div style="display:flex;flex-direction:column;gap:3px;">
-      <button onclick="abrirSimulado('${d}')">${label}</button>
-      <span style="font-size:10.5px;color:${cor};text-align:center;">${desc}</span>
+      <button onclick="abrirSimulado('${d}')">${label}${jaFez ? ' ✓' : ''}</button>
+      <span style="font-size:10.5px;color:${cor};text-align:center;">${desc}${jaFez ? ' · já feito' : ''}</span>
     </div>`;
   }).join('');
 }
@@ -1087,13 +1126,26 @@ function loadDay(day){
   activeDay = day;
   renderTheory(day);
   const data = QUIZZES[day];
-  activeQuestions = shuffleQuestions(shuffleWithinGroups(data.questions));
-  score = 0;
-  answered = new Array(activeQuestions.length).fill(false);
   document.getElementById('quizDayLabel').textContent = data.label;
   document.getElementById('quizDaySub').textContent = data.sub;
   document.getElementById('resultCard').classList.remove('show');
   updateGates();
+
+  const jaRespondeu = currentStudent && quizResults[currentStudent] && quizResults[currentStudent][day];
+  if(jaRespondeu){
+    activeQuestions = []; answered = []; score = jaRespondeu.score;
+    document.getElementById('progressFill').style.width = '100%';
+    document.getElementById('quizArea').innerHTML = '<div class="card"><h2>Você já respondeu este questionário</h2>'
+      + '<p class="hint">Cada questionário só pode ser feito uma vez — o resultado abaixo já está contabilizado.</p></div>';
+    document.getElementById('resultCard').classList.add('show');
+    document.getElementById('scoreText').textContent = jaRespondeu.score + '/' + jaRespondeu.total;
+    document.getElementById('scoreDetail').textContent = Math.round(jaRespondeu.score/jaRespondeu.total*100) + '% de acerto — sem nova tentativa disponível.';
+    return;
+  }
+
+  activeQuestions = shuffleQuestions(shuffleWithinGroups(data.questions));
+  score = 0;
+  answered = new Array(activeQuestions.length).fill(false);
   renderQuiz();
   updateProgress();
 }
@@ -1404,6 +1456,7 @@ let simChosenDate = null;
 let simRunning = false;
 
 function abrirSimulado(date){
+  if(!currentStudent){ goToView('lista-simulados'); return; }
   hideAllViews();
   document.getElementById('view-simulado').style.display = '';
   const data = SIMULADOS[date];
@@ -1413,11 +1466,24 @@ function abrirSimulado(date){
   simChosenDate = date;
   simRunning = false;
   document.getElementById('simTimerBox').style.display = 'none';
-  document.getElementById('simQuizArea').innerHTML = '';
   document.getElementById('simResultCard').classList.remove('show');
   document.getElementById('simIndisponivel').style.display = data ? 'none' : '';
   renderSimuladoTable();
   updateGates();
+
+  const jaFez = currentStudent && state.simulados[date] && state.simulados[date][currentStudent];
+  if(jaFez){
+    document.getElementById('simSetupArea').style.display = 'none';
+    document.getElementById('simQuizArea').innerHTML = '<div class="card"><h2>Você já fez este simulado</h2>'
+      + '<p class="hint">Cada simulado só pode ser feito uma vez — o resultado abaixo já está contabilizado.</p></div>';
+    document.getElementById('simResultCard').classList.add('show');
+    const total = data ? data.questions.length : 50;
+    document.getElementById('simScoreText').textContent = jaFez.acertos + '/' + total;
+    document.getElementById('simScoreDetail').textContent = Math.round(jaFez.acertos/total*100) + '% de acerto — tempo utilizado: ' + (jaFez.tempo || '—') + ' min. Sem nova tentativa disponível.';
+    return;
+  }
+
+  document.getElementById('simQuizArea').innerHTML = '';
   document.getElementById('simSetupArea').style.display = (data && currentStudent) ? '' : 'none';
 }
 
@@ -1553,6 +1619,7 @@ async function init(){
   try{ await loadCadernoErros(); }catch(e){ console.error(e); }
   renderRankingGeral();
   try{ await verificarMultasPendentes(); }catch(e){ console.error(e); }
+  goToView('painel');
 }
 init();
 </script>
