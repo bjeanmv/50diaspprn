@@ -142,7 +142,7 @@
       </div>
     </div>
     <div class="nav">
-      <div class="nav-group">
+      <div class="nav-group" id="alunoNavGroup">
         <label for="studentSelect">Aluno</label>
         <select id="studentSelect" onchange="onStudentChange(this.value)"></select>
       </div>
@@ -1602,6 +1602,7 @@ function goToView(view){
   document.getElementById('tagRow').style.display = '';
   document.getElementById('navButtons').style.display = '';
   document.getElementById('btnLogout').style.display = '';
+  document.getElementById('alunoNavGroup').style.display = 'none';
   marcarBotaoNavAtivo(view);
 
   if(view === 'painel'){
