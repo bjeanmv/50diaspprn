@@ -176,6 +176,15 @@
     </div>
   </div>
 
+  <div id="aniversarioOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.82); z-index:1001; align-items:center; justify-content:center; padding:20px;">
+    <div class="card" style="max-width:380px; width:100%; margin:0; text-align:center; border:2px solid var(--accent); box-shadow:0 0 40px rgba(227,162,58,.35);">
+      <div style="font-size:52px; line-height:1; margin-bottom:8px;">🎉🎂🎉</div>
+      <h2 style="color:var(--accent); margin-bottom:4px;">Feliz Aniversário, Arlley Max!</h2>
+      <p class="hint" style="font-size:14px; line-height:1.5;">A equipe Foco na Missão te deseja um dia incrível — que essa nova volta ao sol venha carregada de muita saúde, força e, claro, aprovação no PPRN! 🎯</p>
+      <button onclick="document.getElementById('aniversarioOverlay').style.display='none'" style="margin-top:14px;">Obrigado! 🎈</button>
+    </div>
+  </div>
+
   <div id="senhaModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.78); z-index:1000; align-items:center; justify-content:center; padding:20px;">
     <div class="card" style="max-width:360px; width:100%; margin:0; text-align:center;">
       <h2 id="senhaModalTitulo">Senha</h2>
@@ -3009,25 +3018,31 @@ const SIMULADOS = {
 
 /* Exceção pontual: o Dia 16 (11/08) teve conteúdo corrigido (percentuais
    de progressão da LEP desatualizados) depois do prazo normal já ter
-   vencido. Para dar a todos a chance de fazê-lo com a versão corrigida,
-   o prazo dele foi reaberto até a meia-noite de "hoje" — calculada
-   sempre em relação ao dia real em que a página for carregada, e não
-   uma data fixa. Passado esse prazo estendido, o Dia 16 volta a seguir
-   a regra normal (03h do dia seguinte à data original). */
+   vencido. Para dar a quase todos a chance de fazê-lo com a versão
+   corrigida, o prazo dele foi reaberto até a meia-noite de "hoje" —
+   calculada sempre em relação ao dia real em que a página for carregada.
+   Arlley Max está excluído dessa exceção e segue a regra normal (03h do
+   dia seguinte à data original, já vencida). Passada a meia-noite de
+   hoje, o Dia 16 volta a seguir a regra normal pra todo mundo. */
 const PRAZO_ESTENDIDO = {
-  "2026-08-11": function(){
-    const agora = new Date();
-    return new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 1, 0, 0, 0);
+  "2026-08-11": {
+    excecoes: ["Arlley Max"],
+    calcular: function(){
+      const agora = new Date();
+      return new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 1, 0, 0, 0);
+    }
   }
 };
-function getPrazoFinal(dateStr){
-  if(PRAZO_ESTENDIDO[dateStr]) return PRAZO_ESTENDIDO[dateStr]();
+function getPrazoFinal(dateStr, nome){
+  const quemChecar = (nome !== undefined) ? nome : currentStudent;
+  const regra = PRAZO_ESTENDIDO[dateStr];
+  if(regra && !(regra.excecoes || []).includes(quemChecar)) return regra.calcular();
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d + 1, 3, 0, 0); // 03h do dia seguinte
 }
-function statusJanela(dateStr){
+function statusJanela(dateStr, nome){
   if(!dateStr) return { estado: 'sem-data' };
-  const fecha = getPrazoFinal(dateStr);
+  const fecha = getPrazoFinal(dateStr, nome);
   return { estado: (new Date() > fecha ? 'encerrada' : 'aberta'), fecha };
 }
 function fmtHora(dt){
@@ -3054,7 +3069,7 @@ const MULTA_A_PARTIR_DE = "2026-07-27";
 async function aplicarMultaJanelaSeNecessario(tipo, dateStr, nome){
   if(!nome || !dateStr) return;
   if(dateStr < MULTA_A_PARTIR_DE) return;
-  if(statusJanela(dateStr).estado === 'aberta') return;
+  if(statusJanela(dateStr, nome).estado === 'aberta') return;
   const podeMultar = await registrarMultaPrazoSeNecessario(tipo, dateStr, nome);
   if(!podeMultar) return; // já tinha sido multado antes (ou falhou ao registrar) — não cobra de novo
   await ajustarDiasFurados(nome, +1);
@@ -3063,7 +3078,9 @@ async function aplicarMultaJanelaSeNecessario(tipo, dateStr, nome){
 /* Verifica, para todo dia/simulado cujo prazo já venceu (a partir do Dia 3), quem
    nunca completou — e aplica a multa retroativa. O controle de "já multado" é
    feito no banco (tabela multas_prazo, com chave única), então funciona igual
-   em qualquer navegador/dispositivo, sem depender de nada local. */
+   em qualquer navegador/dispositivo, sem depender de nada local. A verificação
+   do prazo é feita por pessoa (e não uma vez por dia), pois algumas datas têm
+   exceção de prazo válida só para determinados nomes (ver PRAZO_ESTENDIDO). */
 async function verificarMultasPendentes(){
   if(!MEMBERS || MEMBERS.length === 0 || !supabaseClient) return;
 
@@ -3074,15 +3091,17 @@ async function verificarMultasPendentes(){
   const pendentes = [];
   for(const day of Object.keys(QUIZZES)){
     const dateStr = QUIZZES[day].date;
-    if(!dateStr || dateStr < MULTA_A_PARTIR_DE || statusJanela(dateStr).estado !== 'encerrada') continue;
+    if(!dateStr || dateStr < MULTA_A_PARTIR_DE) continue;
     for(const nome of MEMBERS){
+      if(statusJanela(dateStr, nome).estado !== 'encerrada') continue;
       if(jaMultados.has('dia:'+dateStr+':'+nome)) continue;
       if(!buscarResultadoLocal('dia', day, nome)) pendentes.push({ tipo: 'dia', chave: dateStr, nome });
     }
   }
   for(const dateStr of Object.keys(SIMULADOS)){
-    if(dateStr < MULTA_A_PARTIR_DE || statusJanela(dateStr).estado !== 'encerrada') continue;
+    if(dateStr < MULTA_A_PARTIR_DE) continue;
     for(const nome of MEMBERS){
+      if(statusJanela(dateStr, nome).estado !== 'encerrada') continue;
       if(jaMultados.has('sim:'+dateStr+':'+nome)) continue;
       if(!buscarResultadoLocal('sim', dateStr, nome)) pendentes.push({ tipo: 'sim', chave: dateStr, nome });
     }
@@ -3331,6 +3350,18 @@ function finalizarLoginComSucesso(nome){
   if(welcomeSel) welcomeSel.value = nome;
   updateGates();
   goToView('ranking-geral');
+  mostrarAniversarioSeForHoje(nome);
+}
+
+/* Mensagem pontual de aniversário — aparece só no dia certo, e só pra
+   quem faz aniversário nesse dia. Ajuste ANIVERSARIOS conforme necessário. */
+const ANIVERSARIOS = {
+  "Arlley Max": "2026-08-12"
+};
+function mostrarAniversarioSeForHoje(nome){
+  if(ANIVERSARIOS[nome] && hojeISO() === ANIVERSARIOS[nome]){
+    document.getElementById('aniversarioOverlay').style.display = 'flex';
+  }
 }
 
 function updateGates(){
