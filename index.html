@@ -3006,7 +3006,22 @@ const SIMULADOS = {
    de horário mínimo. Depois das 03h, o prazo vence e conta multa
    (dias_furados) — tanto se for feito atrasado quanto se nunca for feito.
    ========================================================= */
+
+/* Exceção pontual: o Dia 16 (11/08) teve conteúdo corrigido (percentuais
+   de progressão da LEP desatualizados) depois do prazo normal já ter
+   vencido. Para dar a todos a chance de fazê-lo com a versão corrigida,
+   o prazo dele foi reaberto até a meia-noite de "hoje" — calculada
+   sempre em relação ao dia real em que a página for carregada, e não
+   uma data fixa. Passado esse prazo estendido, o Dia 16 volta a seguir
+   a regra normal (03h do dia seguinte à data original). */
+const PRAZO_ESTENDIDO = {
+  "2026-08-11": function(){
+    const agora = new Date();
+    return new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 1, 0, 0, 0);
+  }
+};
 function getPrazoFinal(dateStr){
+  if(PRAZO_ESTENDIDO[dateStr]) return PRAZO_ESTENDIDO[dateStr]();
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d + 1, 3, 0, 0); // 03h do dia seguinte
 }
