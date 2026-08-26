@@ -593,6 +593,10 @@ function renderRankingGeral(){
   }
 }
 let currentStudent = null;
+/* Quando true, a tentativa em curso (dia ou simulado) é só pra revisão:
+   não sobrescreve o resultado já salvo, não pontua, não conta multa.
+   Usado pelo botão "Refazer para revisão" de quem já concluiu o dia/simulado. */
+let modoRevisao = false;
 
 /* =========================================================
    CONTEÚDO POR DIA — teoria + questionário.
@@ -4748,6 +4752,7 @@ let escolhas = [];
 
 async function loadDay(day){
   activeDay = day;
+  modoRevisao = false;
   renderTheory(day);
   const data = QUIZZES[day];
   document.getElementById('quizDayLabel').textContent = data.label;
@@ -4758,14 +4763,20 @@ async function loadDay(day){
   const existente = currentStudent && buscarResultadoLocal('dia', day, currentStudent);
 
   if(existente && existente.concluido !== false){
-    // Já concluído de verdade — mostra a revisão, sem nova tentativa.
+    // Já concluído de verdade — mostra a revisão, sem nova tentativa que valha ponto,
+    // mas oferece a opção de refazer só para fins de estudo (não sobrescreve nada).
     activeQuestions = []; answered = []; escolhas = []; score = existente.acertos;
     document.getElementById('progressFill').style.width = '100%';
     const area = document.getElementById('quizArea');
     area.innerHTML = '';
     const aviso = document.createElement('div');
     aviso.className = 'card';
-    aviso.innerHTML = '<h2>Você já respondeu este questionário</h2><p class="hint">Cada questionário só pode ser feito uma vez. Veja abaixo a revisão de todas as questões, com a alternativa que você marcou.</p>';
+    aviso.innerHTML = '<h2>Você já respondeu este questionário</h2><p class="hint">Cada questionário só pode ser feito uma vez para valer ponto. Veja abaixo a revisão de todas as questões, com a alternativa que você marcou.</p>';
+    const btnRefazer = document.createElement('button');
+    btnRefazer.textContent = '🔁 Refazer para revisão (não pontua)';
+    btnRefazer.style.marginTop = '10px';
+    btnRefazer.onclick = () => refazerDiaRevisao(day);
+    aviso.appendChild(btnRefazer);
     area.appendChild(aviso);
     if(existente.respostas && existente.respostas.length){
       renderRevisaoEstatica(area, existente.respostas);
@@ -4800,6 +4811,22 @@ async function loadDay(day){
     const respostasIniciais = activeQuestions.map(item => ({ sec: item.sec, q: item.q, opts: item.opts, correct: item.correct, escolhida: null, exp: item.exp }));
     await salvarProgressoQuiz(currentStudent, day, 0, activeQuestions.length, respostasIniciais);
   }
+  renderQuiz();
+  updateProgress();
+}
+
+/* Refaz o questionário de um dia já concluído, só para fins de revisão/estudo:
+   sorteia as questões de novo, mas em modo revisão — ao terminar, finishQuiz()
+   não sobrescreve o resultado salvo, não dá pontos e não mexe em multa. */
+function refazerDiaRevisao(day){
+  activeDay = day;
+  modoRevisao = true;
+  const data = QUIZZES[day];
+  document.getElementById('resultCard').classList.remove('show');
+  activeQuestions = shuffleQuestions(shuffleWithinGroups(data.questions));
+  score = 0;
+  answered = new Array(activeQuestions.length).fill(false);
+  escolhas = new Array(activeQuestions.length).fill(null);
   renderQuiz();
   updateProgress();
 }
@@ -4943,6 +4970,14 @@ async function finishQuiz(){
   if(pct >= 80) msg = 'Excelente domínio do conteúdo deste dia.';
   else if(pct >= 60) msg = 'Bom desempenho — revise os pontos que errou antes do simulado semanal.';
   else msg = 'Vale revisar a teoria deste dia antes de seguir para o próximo tópico.';
+
+  if(modoRevisao){
+    document.getElementById('scoreDetail').textContent = score + '/' + total + ' acertos (' + pct + '%) — ' + msg + ' Modo revisão: esta tentativa não altera seu resultado salvo nem pontua.';
+    card.scrollIntoView({behavior:'smooth', block:'center'});
+    modoRevisao = false;
+    return;
+  }
+
   const dateStr = QUIZZES[activeDay] && QUIZZES[activeDay].date;
   const foraDaJanela = dateStr && dateStr >= MULTA_A_PARTIR_DE && statusJanela(dateStr).estado !== 'aberta';
   if(foraDaJanela) msg += ' Atenção: respondido após o prazo (03h) — multa de R$ 1,00 aplicada, sem contagem de pontos.';
@@ -5186,6 +5221,7 @@ function abrirSimulado(date){
     alert('Este simulado ainda não abriu. Ele fica disponível a partir de ' + fmtDataCurta(new Date(date+'T00:00:00')) + '.');
     return;
   }
+  modoRevisao = false;
   hideAllViews();
   vistaAtual = 'simulado';
   marcarBotaoNavAtivo('simulado');
@@ -5213,7 +5249,12 @@ function abrirSimulado(date){
     area.innerHTML = '';
     const aviso = document.createElement('div');
     aviso.className = 'card';
-    aviso.innerHTML = '<h2>Você já fez este simulado</h2><p class="hint">Cada simulado só pode ser feito uma vez. Veja abaixo a revisão de todas as questões, com a alternativa que você marcou.</p>';
+    aviso.innerHTML = '<h2>Você já fez este simulado</h2><p class="hint">Cada simulado só pode ser feito uma vez para valer ponto. Veja abaixo a revisão de todas as questões, com a alternativa que você marcou.</p>';
+    const btnRefazer = document.createElement('button');
+    btnRefazer.textContent = '🔁 Refazer para revisão (não pontua)';
+    btnRefazer.style.marginTop = '10px';
+    btnRefazer.onclick = () => refazerSimuladoRevisao(date);
+    aviso.appendChild(btnRefazer);
     area.appendChild(aviso);
     if(existente.respostas && existente.respostas.length){
       renderRevisaoEstatica(area, existente.respostas);
@@ -5265,6 +5306,41 @@ function resumirSimulado(existente, data){
     return;
   }
 
+  if(simInterval) clearInterval(simInterval);
+  simInterval = setInterval(() => {
+    if(simSeconds > 0){
+      simSeconds--; updateSimTimerDisplay();
+    } else {
+      clearInterval(simInterval); simInterval = null; beep();
+      finalizarSimulado();
+    }
+  }, 1000);
+}
+
+/* Refaz um simulado já concluído, só para fins de revisão/estudo: sorteia as
+   questões de novo, com o mesmo cronômetro, mas em modo revisão — ao terminar,
+   finalizarSimulado() não sobrescreve o resultado salvo, não dá pontos e não
+   mexe em multa. Não salva progresso incremental no banco (evita sobrescrever
+   o registro original caso a pessoa feche a aba no meio da revisão). */
+function refazerSimuladoRevisao(date){
+  const data = SIMULADOS[date];
+  if(!data) return;
+  modoRevisao = true;
+  simSelectedDate = date;
+  simQuestions = shuffleQuestions(shuffleWithinGroups(data.questions));
+  simScore = 0;
+  simAnswered = new Array(simQuestions.length).fill(false);
+  simEscolhas = new Array(simQuestions.length).fill(null);
+  simSeconds = simDuracaoSeg(simQuestions.length);
+  simRunning = true;
+  simIniciadoEm = new Date().toISOString();
+
+  document.getElementById('simSetupArea').style.display = 'none';
+  document.getElementById('simTimerBox').style.display = '';
+  document.getElementById('simTimerLabel').textContent = data.label + ' — cronômetro em andamento (modo revisão, não pontua)';
+  document.getElementById('simResultCard').classList.remove('show');
+  updateSimTimerDisplay();
+  renderSimQuiz();
   if(simInterval) clearInterval(simInterval);
   simInterval = setInterval(() => {
     if(simSeconds > 0){
@@ -5413,6 +5489,14 @@ async function finalizarSimulado(){
   card.classList.add('show');
   document.getElementById('simScoreText').textContent = pesoPontosSim + '/' + pesoMaxSim + ' pontos';
   const pct = Math.round(simScore/total*100);
+
+  if(modoRevisao){
+    document.getElementById('simScoreDetail').textContent = simScore + '/' + total + ' acertos (' + pct + '%) — tempo utilizado: ' + elapsedMin + ' min. Modo revisão: esta tentativa não altera seu resultado salvo nem pontua.';
+    card.scrollIntoView({behavior:'smooth', block:'center'});
+    modoRevisao = false;
+    return;
+  }
+
   let detalhe = simScore + '/' + total + ' acertos (' + pct + '%) — tempo utilizado: ' + elapsedMin + ' min.';
   const foraDaJanela = simSelectedDate && simSelectedDate >= MULTA_A_PARTIR_DE && statusJanela(simSelectedDate).estado !== 'aberta';
   if(foraDaJanela) detalhe += ' Atenção: respondido após o prazo (03h) — multa de R$ 1,00 aplicada, sem contagem de pontos.';
